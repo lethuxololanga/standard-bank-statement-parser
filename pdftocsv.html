@@ -1,9 +1,16 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <title>PDF → CSV Converter</title>
+    <title>StatementFlow | PDF → CSV Converter</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Anti-flash: apply saved theme before render -->
+    <script>
+        (function(){
+            var t = localStorage.getItem("sf-theme");
+            if (t) document.documentElement.setAttribute("data-theme", t);
+        })();
+    </script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -13,10 +20,307 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc =
             "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
     </script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="styles/system.css">
+    <link rel="stylesheet" href="styles/converter.css">
+
+    <style>
+        /* ── Page layout ── */
+        .page-wrap       { max-width: 900px; margin: 0 auto; padding: 48px 20px 80px; }
+
+        /* ── Header ── */
+        .page-header     { margin-bottom: 32px; }
+        .page-title      { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+        .page-title h1   { font-size: 28px; font-weight: 700; letter-spacing: -1px; }
+        .page-title-icon { font-size: 26px; }
+        .page-subtitle   { color: var(--text-muted); font-size: 13px; }
+
+        /* ── Nav bar ── */
+        .top-nav         { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
+        .top-nav a       { color: var(--text-dim); font-size: 13px; }
+        .top-nav a:hover { color: var(--text); }
+        .top-nav-sep     { color: var(--text-dim); }
+
+        /* ── Drop zone ── */
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            padding: 48px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s ease;
+            background: var(--surface);
+            user-select: none;
+        }
+        .drop-zone:hover  { border-color: var(--border-hover); }
+        .drop-zone.drag   { border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.03); }
+        .drop-zone.loaded { border-color: rgba(255,255,255,0.25); }
+        .drop-zone-icon   { font-size: 36px; margin-bottom: 10px; }
+        .drop-zone-main   { font-size: 15px; font-weight: 500; color: var(--text); }
+        .drop-zone-sub    { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+        .drop-zone-link   { text-decoration: underline; color: var(--text-muted); }
+
+        /* ── Action row ── */
+        .action-row       { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+        .action-row .push { margin-left: auto; }
+
+        .btn {
+            padding: 10px 18px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            transition: 0.2s ease;
+        }
+        .btn:hover            { border-color: var(--border-hover); opacity: 0.9; }
+        .btn:disabled         { opacity: 0.35; cursor: not-allowed; }
+        .btn.primary          { background: var(--text); color: var(--bg); border-color: transparent; }
+        .btn.primary:hover    { opacity: 0.85; }
+        .btn.ghost            { background: transparent; color: var(--text-dim); }
+        .btn.ghost:hover      { color: var(--text); border-color: var(--border-hover); }
+
+        /* ── Status / error banners ── */
+        .banner {
+            margin-top: 12px;
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            background: var(--surface);
+        }
+        .banner.error { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.85); }
+
+        /* ── Stats bar ── */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+        @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        .stat-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 14px 12px;
+            text-align: center;
+        }
+        .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 6px; }
+        .stat-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+
+        /* ── Filter bar ── */
+        .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; }
+        .filter-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); }
+        .filter-input-wrap { position: relative; }
+        .filter-icon  { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 12px; pointer-events: none; }
+        .filter-clear-x { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 16px; padding: 0; }
+        .filter-clear-x:hover { color: var(--text); }
+
+        input[type="text"], input[type="date"] {
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            width: 100%;
+        }
+        input[type="text"]:focus, input[type="date"]:focus { border-color: var(--border-hover); }
+        input[type="text"].has-icon { padding-left: 28px; }
+
+        .filter-count { font-size: 12px; color: var(--text-dim); white-space: nowrap; align-self: center; padding-bottom: 2px; }
+        .filter-count.active { color: var(--text-muted); }
+
+        /* ── Table ── */
+        .table-wrap {
+            margin-top: 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            background: var(--surface);
+        }
+        .table-scroll { overflow-x: auto; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead tr { background: var(--surface); }
+        th {
+            padding: 10px 12px;
+            text-align: left;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+        }
+        th.right { text-align: right; }
+        td { padding: 7px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+        .td-num  { font-variant-numeric: tabular-nums; color: var(--text-dim); font-size: 11px; text-align: right; }
+        .td-debit  { font-variant-numeric: tabular-nums; color: rgba(255,120,120,0.9); font-weight: 500; }
+        .td-credit { font-variant-numeric: tabular-nums; color: rgba(120,220,140,0.9); font-weight: 500; }
+        .td-balance{ font-variant-numeric: tabular-nums; color: var(--text-muted); }
+
+        td input {
+            width: 100%;
+            background: transparent;
+            border: 1px solid transparent;
+            color: inherit;
+            font-size: inherit;
+            font-family: inherit;
+            padding: 2px 4px;
+            border-radius: 6px;
+            outline: none;
+        }
+        td input:focus { border-color: var(--border-hover); background: rgba(255,255,255,0.03); }
+
+        .del-btn { background: none; border: none; color: transparent; cursor: pointer; font-size: 16px; padding: 0 4px; transition: 0.15s; }
+        tbody tr:hover .del-btn { color: var(--text-dim); }
+        .del-btn:hover { color: #fff !important; }
+
+        tfoot tr { background: var(--surface); border-top: 1px solid var(--border); }
+        tfoot td { padding: 10px 12px; font-size: 12px; color: var(--text-dim); font-weight: 600; }
+
+        .table-footer {
+            padding: 10px 16px;
+            border-top: 1px solid var(--border);
+        }
+        .add-row-btn { background: none; border: none; color: var(--text-dim); font-size: 12px; cursor: pointer; font-family: inherit; padding: 0; }
+        .add-row-btn:hover { color: var(--text); }
+
+        mark { background: rgba(255,255,255,0.15); color: #fff; border-radius: 3px; padding: 0 2px; }
+
+        /* ── Collapsible panels ── */
+        .panel {
+            margin-top: 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            background: var(--surface);
+        }
+        .panel.warn { border-color: rgba(255,200,80,0.2); }
+
+        .panel-toggle {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 13px;
+            font-family: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: left;
+            transition: 0.15s;
+        }
+        .panel-toggle:hover { color: var(--text); }
+        .panel-toggle .ml { margin-left: auto; font-size: 11px; color: var(--text-dim); }
+        .panel.warn .panel-toggle { color: rgba(255,200,80,0.8); }
+
+        .panel-body { padding: 0 16px 14px; }
+        .panel-desc { font-size: 12px; color: var(--text-dim); margin-bottom: 10px; }
+
+        .warn-line {
+            font-family: monospace;
+            font-size: 11px;
+            color: rgba(255,200,80,0.7);
+            background: rgba(255,200,80,0.06);
+            border-radius: 6px;
+            padding: 4px 8px;
+            margin-bottom: 4px;
+        }
+
+        pre.raw-lines {
+            background: #050505;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: rgba(120,220,140,0.8);
+            font-size: 11px;
+            font-family: monospace;
+            line-height: 1.6;
+            padding: 16px;
+            max-height: 280px;
+            overflow: auto;
+        }
+
+        /* ── Footer note ── */
+        .page-footnote { margin-top: 40px; text-align: center; font-size: 12px; color: var(--text-dim); line-height: 2; }
+        .page-footnote span { color: var(--text-muted); }
+
+        /* ── Light mode overrides ── */
+        [data-theme="light"] {
+            --bg:           #f5f5f5;
+            --surface:      #ffffff;
+            --border:       rgba(0,0,0,0.09);
+            --border-hover: rgba(0,0,0,0.22);
+            --text:         #0a0a0a;
+            --text-muted:   rgba(0,0,0,0.55);
+            --text-dim:     rgba(0,0,0,0.35);
+        }
+
+        [data-theme="light"] body { background: var(--bg); color: var(--text); }
+
+        /* Hardcoded rgba whites → light-safe equivalents */
+        [data-theme="light"] .drop-zone.drag   { border-color: rgba(0,0,0,0.3); background: rgba(0,0,0,0.02); }
+        [data-theme="light"] .drop-zone.loaded { border-color: rgba(0,0,0,0.2); }
+        [data-theme="light"] tbody tr:hover    { background: rgba(0,0,0,0.02); }
+        [data-theme="light"] td                { border-bottom-color: rgba(0,0,0,0.05); }
+        [data-theme="light"] td input:focus    { background: rgba(0,0,0,0.02); }
+        [data-theme="light"] .del-btn:hover    { color: #000 !important; }
+        [data-theme="light"] mark              { background: rgba(0,0,0,0.1); color: #000; }
+        [data-theme="light"] pre.raw-lines     { background: #f0f0f0; border-color: var(--border); color: #2a7a2a; }
+        [data-theme="light"] .panel.warn       { border-color: rgba(160,110,0,0.25); }
+        [data-theme="light"] .panel.warn .panel-toggle { color: rgba(140,90,0,0.9); }
+        [data-theme="light"] .warn-line        { color: rgba(140,90,0,0.8); background: rgba(200,140,0,0.08); }
+        [data-theme="light"] .banner.error     { border-color: rgba(0,0,0,0.2); color: rgba(0,0,0,0.85); }
+        [data-theme="light"] .td-debit         { color: #c0392b; }
+        [data-theme="light"] .td-credit        { color: #27ae60; }
+
+        /* ── Theme toggle button ── */
+        .theme-toggle {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-dim);
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: 0.2s ease;
+            user-select: none;
+        }
+        .theme-toggle:hover { border-color: var(--border-hover); color: var(--text); }
+        .theme-toggle-icon  { font-size: 14px; }
+    </style>
+
 </head>
 
-<body class="bg-gray-50 min-h-screen">
+<body>
 <div id="root"></div>
 
 <script type="text/babel">
@@ -247,7 +551,7 @@ function highlight(text, term) {
     return (
         <>
             {text.slice(0, idx)}
-            <mark className="bg-yellow-200 rounded px-0.5">{text.slice(idx, idx + term.length)}</mark>
+            <mark>{text.slice(idx, idx + term.length)}</mark>
             {text.slice(idx + term.length)}
         </>
     );
@@ -269,37 +573,28 @@ function DropZone({ onFile, fileName }) {
             onDragOver={e => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onClick={() => inputRef.current.click()}
-            className={`
-                border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer
-                transition-all duration-150 select-none
-                ${dragOver
-                    ? "border-blue-500 bg-blue-50 scale-[1.01]"
-                    : fileName
-                        ? "border-green-400 bg-green-50"
-                        : "border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50"
-                }
-            `}
+            className={`drop-zone${dragOver ? " drag" : ""}${fileName ? " loaded" : ""}`}
         >
             <input
                 ref={inputRef}
                 type="file"
                 accept="application/pdf"
-                className="hidden"
+                style={{display:"none"}}
                 onChange={e => accept(e.target.files[0])}
             />
             {fileName ? (
                 <>
-                    <div className="text-4xl mb-2">✅</div>
-                    <p className="font-semibold text-gray-700 truncate max-w-sm mx-auto">{fileName}</p>
-                    <p className="text-xs text-gray-400 mt-1">Click to change file</p>
+                    <div className="drop-zone-icon">✓</div>
+                    <p className="drop-zone-main">{fileName}</p>
+                    <p className="drop-zone-sub">Click to change file</p>
                 </>
             ) : (
                 <>
-                    <div className="text-4xl mb-2">📄</div>
-                    <p className="text-gray-500">
-                        Drop a PDF here or <span className="text-blue-600 underline">browse</span>
+                    <div className="drop-zone-icon">📄</div>
+                    <p className="drop-zone-main">
+                        Drop a PDF here or <span className="drop-zone-link">browse</span>
                     </p>
-                    <p className="text-xs text-gray-400 mt-1">Standard Bank MyMoBiz statement</p>
+                    <p className="drop-zone-sub">Standard Bank MyMoBiz statement</p>
                 </>
             )}
         </div>
@@ -312,30 +607,20 @@ function StatsBar({ rows }) {
     const net         = totalCredit - totalDebit;
 
     return (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-            <Stat label="Transactions"  value={rows.length}           color="gray"   prefix=""   />
-            <Stat label="Total Debits"  value={fmtR(totalDebit)}      color="red"    prefix="R " />
-            <Stat label="Total Credits" value={fmtR(totalCredit)}     color="green"  prefix="R " />
-            <Stat
-                label="Net"
-                value={fmtR(Math.abs(net))}
-                color={net >= 0 ? "blue" : "orange"}
-                prefix={net < 0 ? "-R " : "R "}
-            />
+        <div className="stats-grid">
+            <Stat label="Transactions"  value={rows.length}       prefix=""   />
+            <Stat label="Total Debits"  value={fmtR(totalDebit)}  prefix="R " />
+            <Stat label="Total Credits" value={fmtR(totalCredit)} prefix="R " />
+            <Stat label="Net"           value={fmtR(Math.abs(net))} prefix={net < 0 ? "−R " : "R "} />
         </div>
     );
 }
 
-function Stat({ label, value, color, prefix }) {
-    const bg = { gray:"bg-white border-gray-200 text-gray-800", red:"bg-red-50 border-red-100 text-red-700",
-                 green:"bg-green-50 border-green-100 text-green-700", blue:"bg-blue-50 border-blue-100 text-blue-700",
-                 orange:"bg-orange-50 border-orange-100 text-orange-700" };
-    const lc = { gray:"text-gray-400", red:"text-red-400", green:"text-green-500",
-                 blue:"text-blue-400", orange:"text-orange-400" };
+function Stat({ label, value, prefix }) {
     return (
-        <div className={`rounded-xl p-3 border shadow-sm text-center ${bg[color]}`}>
-            <div className={`text-[10px] uppercase tracking-widest mb-1 ${lc[color]}`}>{label}</div>
-            <div className="text-xl font-bold tabular-nums">{prefix}{value}</div>
+        <div className="stat-box">
+            <div className="stat-label">{label}</div>
+            <div className="stat-value">{prefix}{value}</div>
         </div>
     );
 }
@@ -343,70 +628,55 @@ function Stat({ label, value, color, prefix }) {
 function FilterBar({ search, onSearch, dateFrom, dateTo, onDateFrom, onDateTo, onClear, total, showing }) {
     const active = search || dateFrom || dateTo;
     return (
-        <div className="flex flex-wrap gap-3 items-end mt-4 p-4 bg-white rounded-xl border shadow-sm">
+        <div className="filter-bar">
             {/* Search */}
-            <div className="flex-1 min-w-48">
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Search description</label>
-                <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">🔍</span>
+            <div className="filter-group">
+                <label className="filter-label">Search description</label>
+                <div className="filter-input-wrap">
+                    <span className="filter-icon">🔍</span>
                     <input
                         type="text"
                         value={search}
                         onChange={e => onSearch(e.target.value)}
                         placeholder="e.g. CANVA, PAYSHAP…"
-                        className="w-full pl-8 pr-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        className="has-icon"
                     />
                     {search && (
-                        <button
-                            onClick={() => onSearch("")}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-600 text-lg leading-none"
-                        >×</button>
+                        <button className="filter-clear-x" onClick={() => onSearch("")}>×</button>
                     )}
                 </div>
             </div>
 
             {/* Date from */}
-            <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">From</label>
-                <input
-                    type="date"
-                    value={dateFrom}
-                    onChange={e => onDateFrom(e.target.value)}
-                    className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-gray-700"
-                />
+            <div className="filter-group" style={{flex:"0 0 auto", minWidth:"140px"}}>
+                <label className="filter-label">From</label>
+                <input type="date" value={dateFrom} onChange={e => onDateFrom(e.target.value)} />
             </div>
 
             {/* Date to */}
-            <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">To</label>
-                <input
-                    type="date"
-                    value={dateTo}
-                    onChange={e => onDateTo(e.target.value)}
-                    className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-gray-700"
-                />
+            <div className="filter-group" style={{flex:"0 0 auto", minWidth:"140px"}}>
+                <label className="filter-label">To</label>
+                <input type="date" value={dateTo} onChange={e => onDateTo(e.target.value)} />
             </div>
 
             {/* Count + clear */}
-            <div className="flex items-center gap-2 pb-0.5">
+            <div style={{display:"flex", alignItems:"center", gap:"8px", paddingBottom:"2px"}}>
                 {active ? (
                     <>
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${showing < total ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-500"}`}>
-                            {showing} of {total}
+                        <span className={`filter-count${showing < total ? " active" : ""}`}>
+                            {showing} / {total}
                         </span>
-                        <button
-                            onClick={onClear}
-                            className="text-xs text-red-400 hover:text-red-600 transition-colors font-medium"
-                        >Clear filters</button>
+                        <button className="btn ghost" style={{padding:"6px 12px"}} onClick={onClear}>
+                            Clear
+                        </button>
                     </>
                 ) : (
-                    <span className="text-xs text-gray-400">{total} row{total !== 1 ? "s" : ""}</span>
+                    <span className="filter-count">{total} row{total !== 1 ? "s" : ""}</span>
                 )}
             </div>
         </div>
     );
 }
-
 function TransactionTable({ entries, onDelete, onAddRow, onChange, search }) {
     const fields  = ["date", "description", "debit", "credit", "balance"];
     const headers = ["Date", "Description", "Debit", "Credit", "Balance"];
@@ -415,82 +685,70 @@ function TransactionTable({ entries, onDelete, onAddRow, onChange, search }) {
     const totalCredit = entries.reduce((s, { row: r }) => s + (parseFloat(r.credit) || 0), 0);
 
     return (
-        <div className="overflow-x-auto rounded-xl border bg-white shadow-sm mt-4">
-            <table className="w-full text-sm">
-                <thead>
-                    <tr className="bg-gray-100 text-gray-500 uppercase text-[11px] tracking-wide">
-                        <th className="px-3 py-2 border-b text-right w-8 font-medium">#</th>
-                        {headers.map(h => (
-                            <th key={h} className="px-2 py-2 border-b text-left font-medium">{h}</th>
-                        ))}
-                        <th className="px-2 py-2 border-b w-8"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {entries.map(({ row: r, idx }, displayI) => {
-                        const isDebit = !!r.debit;
-                        const rowBg = isDebit
-                            ? (displayI % 2 === 0 ? "bg-white hover:bg-red-50"   : "bg-red-50/30 hover:bg-red-50")
-                            : (displayI % 2 === 0 ? "bg-white hover:bg-green-50" : "bg-green-50/30 hover:bg-green-50");
-                        return (
-                            <tr key={idx} className={`border-b last:border-0 group transition-colors ${rowBg}`}>
-                                <td className="px-3 py-1 text-right text-gray-300 text-xs">{idx + 1}</td>
+        <div className="table-wrap">
+            <div className="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th className="right" style={{width:"36px"}}>#</th>
+                            {headers.map(h => <th key={h}>{h}</th>)}
+                            <th style={{width:"32px"}}></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {entries.map(({ row: r, idx }) => (
+                            <tr key={idx} className="group">
+                                <td className="td-num">{idx + 1}</td>
                                 {fields.map(f => (
-                                    <td key={f} className="px-1 py-0.5">
+                                    <td key={f}>
                                         {f === "description" ? (
-                                            <div className={`px-1.5 py-0.5 text-sm ${search ? "" : ""}`}>
+                                            <div style={{padding:"2px 4px", fontSize:"13px"}}>
                                                 {highlight(r[f] || "", search)}
                                             </div>
                                         ) : (
                                             <input
                                                 value={r[f] || ""}
                                                 onChange={e => onChange(idx, f, e.target.value)}
-                                                className={`
-                                                    w-full px-1.5 py-0.5 rounded bg-transparent border-0
-                                                    focus:bg-white focus:ring-1 focus:ring-blue-300 outline-none
-                                                    ${f === "debit"  && r.debit  ? "text-red-600 font-medium tabular-nums"   : ""}
-                                                    ${f === "credit" && r.credit ? "text-green-600 font-medium tabular-nums" : ""}
-                                                    ${f === "balance"            ? "text-gray-500 tabular-nums" : ""}
-                                                    ${f === "date"               ? "tabular-nums" : ""}
-                                                `}
+                                                className={
+                                                    f === "debit"   && r.debit  ? "td-debit"   :
+                                                    f === "credit"  && r.credit ? "td-credit"  :
+                                                    f === "balance"             ? "td-balance"  : ""
+                                                }
                                             />
                                         )}
                                     </td>
                                 ))}
-                                <td className="px-2 py-1 text-center">
+                                <td style={{textAlign:"center"}}>
                                     <button
+                                        className="del-btn"
                                         onClick={() => onDelete(idx)}
                                         title="Delete row"
-                                        className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all text-lg leading-none"
                                     >×</button>
                                 </td>
                             </tr>
-                        );
-                    })}
-                    {entries.length === 0 && (
+                        ))}
+                        {entries.length === 0 && (
+                            <tr>
+                                <td colSpan={7} style={{textAlign:"center", padding:"40px", color:"var(--text-dim)"}}>
+                                    No transactions match your filters.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                    <tfoot>
                         <tr>
-                            <td colSpan={7} className="py-10 text-center text-gray-400 text-sm">
-                                No transactions match your filters.
-                            </td>
+                            <td></td>
+                            <td colSpan={2} style={{textAlign:"right", fontSize:"10px", textTransform:"uppercase", letterSpacing:"0.08em"}}>Totals</td>
+                            <td className="td-debit">R {fmtR(totalDebit)}</td>
+                            <td className="td-credit">R {fmtR(totalCredit)}</td>
+                            <td></td>
+                            <td></td>
                         </tr>
-                    )}
-                </tbody>
-                <tfoot>
-                    <tr className="bg-gray-50 font-semibold border-t-2 border-gray-200 text-sm">
-                        <td className="px-3 py-2"></td>
-                        <td className="px-2 py-2 text-right text-gray-400 text-xs uppercase tracking-wide" colSpan={2}>Totals</td>
-                        <td className="px-2 py-2 text-red-600 tabular-nums">R {fmtR(totalDebit)}</td>
-                        <td className="px-2 py-2 text-green-600 tabular-nums">R {fmtR(totalCredit)}</td>
-                        <td className="px-2 py-2"></td>
-                        <td></td>
-                    </tr>
-                </tfoot>
-            </table>
-            <div className="px-3 py-2 border-t bg-gray-50 rounded-b-xl">
-                <button
-                    onClick={onAddRow}
-                    className="text-xs text-blue-500 hover:text-blue-700 font-medium transition-colors"
-                >+ Add row</button>
+                    </tfoot>
+                </table>
+            </div>
+            <div className="table-footer">
+                <button className="add-row-btn" onClick={onAddRow}>+ Add row</button>
             </div>
         </div>
     );
@@ -500,22 +758,19 @@ function WarningsPanel({ warnings }) {
     const [open, setOpen] = useState(true);
     if (!warnings.length) return null;
     return (
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 overflow-hidden">
-            <button
-                onClick={() => setOpen(o => !o)}
-                className="w-full flex items-center gap-2 px-4 py-3 text-left text-sm font-medium text-amber-800 hover:bg-amber-100 transition-colors"
-            >
+        <div className="panel warn">
+            <button className="panel-toggle" onClick={() => setOpen(o => !o)}>
                 <span>⚠</span>
                 <span>{warnings.length} incomplete row{warnings.length !== 1 ? "s" : ""} skipped</span>
-                <span className="ml-auto text-amber-500 text-xs">{open ? "▲ hide" : "▼ show"}</span>
+                <span className="ml">{open ? "▲ hide" : "▼ show"}</span>
             </button>
             {open && (
-                <div className="px-4 pb-3 space-y-1">
-                    <p className="text-xs text-amber-700 mb-2">
+                <div className="panel-body">
+                    <p className="panel-desc">
                         These lines were found in the PDF but couldn't be parsed as complete transactions (missing date or balance).
                     </p>
                     {warnings.map((w, i) => (
-                        <div key={i} className="font-mono text-xs text-amber-900 bg-amber-100 rounded px-2 py-1">{w}</div>
+                        <div key={i} className="warn-line">{w}</div>
                     ))}
                 </div>
             )}
@@ -527,17 +782,18 @@ function RawLinesPanel({ lines }) {
     const [open, setOpen] = useState(false);
     if (!lines.length) return null;
     return (
-        <div className="mt-4">
-            <button
-                onClick={() => setOpen(o => !o)}
-                className="text-xs text-gray-400 hover:text-gray-600 transition-colors font-mono"
-            >
-                {open ? "▼" : "▶"} Raw PDF lines ({lines.length}) — expand to diagnose parsing
+        <div className="panel" style={{marginTop:"16px"}}>
+            <button className="panel-toggle" onClick={() => setOpen(o => !o)}>
+                <span>{open ? "▼" : "▶"}</span>
+                <span>Raw PDF lines ({lines.length})</span>
+                <span className="ml">expand to diagnose parsing</span>
             </button>
             {open && (
-                <pre className="mt-2 p-4 bg-gray-900 text-green-300 text-xs rounded-xl overflow-auto max-h-72 font-mono leading-5">
-                    {lines.map((l, i) => `${String(i + 1).padStart(4)} │ ${l}`).join("\n")}
-                </pre>
+                <div className="panel-body">
+                    <pre className="raw-lines">
+                        {lines.map((l, i) => `${String(i + 1).padStart(4)} │ ${l}`).join("\n")}
+                    </pre>
+                </div>
             )}
         </div>
     );
@@ -556,6 +812,20 @@ function App() {
     const [warnings, setWarnings] = useState([]);
     const [copied,   setCopied]   = useState(false);
     const [resetKey, setResetKey] = useState(0);
+    const [theme,    setTheme]    = useState(() => {
+        const saved = localStorage.getItem("sf-theme");
+        return saved || "dark";
+    });
+
+    // Apply theme to <html> element
+    React.useEffect(() => {
+        document.documentElement.setAttribute("data-theme", theme);
+        localStorage.setItem("sf-theme", theme);
+    }, [theme]);
+
+    function toggleTheme() {
+        setTheme(t => t === "dark" ? "light" : "dark");
+    }
 
     // Filter state
     const [search,   setSearch]   = useState("");
@@ -690,75 +960,62 @@ function App() {
     const hasData = rows.length > 0;
 
     return (
-        <div className="max-w-5xl mx-auto px-4 py-8 md:py-12">
+        <div className="page-wrap">
+
+            {/* Nav breadcrumb */}
+            <div className="top-nav">
+                <a href="index.html">StatementFlow</a>
+                <span className="top-nav-sep">›</span>
+                <span style={{color:"var(--text-muted)"}}>Standard Bank Parser</span>
+                <button className="theme-toggle" onClick={toggleTheme}>
+                    <span className="theme-toggle-icon">{theme === "dark" ? "☀" : "☾"}</span>
+                    {theme === "dark" ? "Light" : "Dark"}
+                </button>
+            </div>
 
             {/* Header */}
-            <div className="mb-8">
-                <div className="flex items-center gap-3 mb-1">
-                    <span className="text-3xl">🏦</span>
-                    <h1 className="text-3xl font-bold text-gray-800 tracking-tight">PDF → CSV</h1>
+            <div className="page-header">
+                <div className="page-title">
+                    <span className="page-title-icon">▣</span>
+                    <h1>PDF → CSV</h1>
                 </div>
-                <p className="text-gray-400 text-sm ml-12">
-                    Extract Standard Bank MyMoBiz statement transactions to CSV
-                </p>
+                <p className="page-subtitle">Extract Standard Bank MyMoBiz statement transactions to CSV</p>
             </div>
 
             <DropZone key={resetKey} onFile={handleFileSelected} fileName={file?.name} />
 
             {/* Action buttons */}
-            <div className="flex flex-wrap items-center gap-2 mt-4">
+            <div className="action-row">
                 <button
+                    className="btn primary"
                     onClick={extract}
                     disabled={!file || busy}
-                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg font-medium text-sm transition-colors shadow-sm"
                 >
                     {busy ? `Processing ${progress.current}/${progress.total}…` : "Extract transactions"}
                 </button>
 
                 {hasData && (
                     <>
-                        <button
-                            onClick={downloadCSV}
-                            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium text-sm transition-colors shadow-sm"
-                        >
+                        <button className="btn" onClick={downloadCSV}>
                             ↓ {filtersActive ? "Download filtered CSV" : "Download CSV"}
                         </button>
-                        <button
-                            onClick={copyCSV}
-                            className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium text-sm transition-colors shadow-sm"
-                        >
+                        <button className="btn" onClick={copyCSV}>
                             {copied ? "✓ Copied!" : filtersActive ? "Copy filtered CSV" : "Copy CSV"}
                         </button>
                     </>
                 )}
 
                 {(file || hasData) && (
-                    <button
-                        onClick={handleReset}
-                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg font-medium text-sm transition-colors ml-auto"
-                    >Clear</button>
+                    <button className="btn ghost push" onClick={handleReset}>Clear</button>
                 )}
             </div>
 
             {/* Status / error */}
-            {status && !error && (
-                <div className="mt-3 text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-4 py-2">
-                    {status}
-                </div>
-            )}
-            {error && (
-                <div className="mt-3 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-4 py-2">
-                    ⚠ {error}
-                </div>
-            )}
+            {status && !error && <div className="banner">{status}</div>}
+            {error && <div className="banner error">⚠ {error}</div>}
 
-            {/* Stats — always reflects filtered view */}
             {hasData && <StatsBar rows={filteredRows} />}
-
-            {/* Warnings for incomplete rows */}
             {hasData && <WarningsPanel warnings={warnings} />}
-
-            {/* Filter bar */}
             {hasData && (
                 <FilterBar
                     search={search}       onSearch={setSearch}
@@ -769,8 +1026,6 @@ function App() {
                     showing={filteredEntries.length}
                 />
             )}
-
-            {/* Table */}
             {hasData && (
                 <TransactionTable
                     entries={filteredEntries}
@@ -783,9 +1038,9 @@ function App() {
 
             <RawLinesPanel lines={rawLines} />
 
-            <div className="mt-8 text-center text-xs text-gray-400 space-y-1">
+            <div className="page-footnote">
                 <p>Runs entirely in your browser — no data is uploaded anywhere.</p>
-                <p>Developed by <span className="font-semibold text-gray-500">Lethu Langa</span></p>
+                <p>StatementFlow is developed by <span>Lethu Langa</span></p>
             </div>
         </div>
     );
