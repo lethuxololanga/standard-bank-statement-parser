@@ -26,7 +26,7 @@
 
     <link rel="stylesheet" href="styles/system.css">
     <link rel="stylesheet" href="styles/converter.css">
-
+    <link rel="icon" type="image/svg+xml" href="/asset/favicon.svg">
     <style>
         /* ── Page layout ── */
         .page-wrap       { max-width: 900px; margin: 0 auto; padding: 48px 20px 80px; }
@@ -966,7 +966,7 @@ function App() {
             <div className="top-nav">
                 <a href="index.html">StatementFlow</a>
                 <span className="top-nav-sep">›</span>
-                <span style={{color:"var(--text-muted)"}}>Standard Bank Parser</span>
+                <span style={{color:"var(--text-muted)"}}>Standard Bank Converter</span>
                 <button className="theme-toggle" onClick={toggleTheme}>
                     <span className="theme-toggle-icon">{theme === "dark" ? "☀" : "☾"}</span>
                     {theme === "dark" ? "Light" : "Dark"}
@@ -976,10 +976,11 @@ function App() {
             {/* Header */}
             <div className="page-header">
                 <div className="page-title">
-                    <span className="page-title-icon">▣</span>
-                    <h1>PDF → CSV</h1>
+                    {/* <span className="page-title-icon">▣</span> */}
+                    <img src="https://cdn.brandfetch.io/idDKBygDQO/theme/light/symbol.svg?c=1bxid64Mup7aczewSAYMX&t=1668074901080" alt="StatementFlow" style={{width:'32px',height:'32px',objectFit:'contain'}} />
+                    <h2>PDF → CSV</h2>
                 </div>
-                <p className="page-subtitle">Extract Standard Bank MyMoBiz statement transactions to CSV</p>
+                <p className="page-subtitle">Transform your Standard Bank statement into clean, structured data - instantly.</p>
             </div>
 
             <DropZone key={resetKey} onFile={handleFileSelected} fileName={file?.name} />
