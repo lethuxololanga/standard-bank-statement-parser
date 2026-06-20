@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>StatementFlow | GoTyme PDF → CSV Converter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        (function(){
+            var t = localStorage.getItem("sf-theme");
+            if (t) document.documentElement.setAttribute("data-theme", t);
+        })();
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="styles/system.css">
+    <link rel="stylesheet" href="styles/converter.css">
+    <link rel="icon" type="image/svg+xml" href="/asset/favicon.svg">
+    <style>
+        .page-wrap       { max-width: 900px; margin: 0 auto; padding: 48px 20px 80px; }
+
+        .page-header     { margin-bottom: 32px; }
+        .page-title      { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+        .page-title h1   { font-size: 28px; font-weight: 700; letter-spacing: -1px; }
+        .page-title-icon { font-size: 26px; }
+        .page-subtitle   { color: var(--text-muted); font-size: 13px; }
+
+        .top-nav         { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
+        .top-nav a       { color: var(--text-dim); font-size: 13px; }
+        .top-nav a:hover { color: var(--text); }
+        .top-nav-sep     { color: var(--text-dim); }
+
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            padding: 48px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s ease;
+            background: var(--surface);
+            user-select: none;
+        }
+        .drop-zone:hover  { border-color: var(--border-hover); }
+        .drop-zone.drag   { border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.03); }
+        .drop-zone.loaded { border-color: rgba(255,255,255,0.25); }
+        .drop-zone-icon   { font-size: 36px; margin-bottom: 10px; }
+        .drop-zone-main   { font-size: 15px; font-weight: 500; color: var(--text); }
+        .drop-zone-sub    { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+        .drop-zone-link   { text-decoration: underline; color: var(--text-muted); }
+
+        .action-row       { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+        .action-row .push { margin-left: auto; }
+
+        .btn {
+            padding: 10px 18px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            transition: 0.2s ease;
+        }
+        .btn:hover            { border-color: var(--border-hover); opacity: 0.9; }
+        .btn:disabled         { opacity: 0.35; cursor: not-allowed; }
+        .btn.primary          { background: var(--text); color: var(--bg); border-color: transparent; }
+        .btn.primary:hover    { opacity: 0.85; }
+        .btn.ghost            { background: transparent; color: var(--text-dim); }
+        .btn.ghost:hover      { color: var(--text); border-color: var(--border-hover); }
+
+        .banner {
+            margin-top: 12px;
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            background: var(--surface);
+        }
+        .banner.error { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.85); }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+        @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        .stat-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 14px 12px;
+            text-align: center;
+        }
+        .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 6px; }
+        .stat-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+
+        .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; }
+        .filter-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); }
+        .filter-input-wrap { position: relative; }
+        .filter-icon  { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 12px; pointer-events: none; }
+        .filter-clear-x { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 16px; padding: 0; }
+        .filter-clear-x:hover { color: var(--text); }
+
+        input[type="text"], input[type="date"], input[type="password"] {
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            width: 100%;
+        }
+        input[type="text"]:focus, input[type="date"]:focus, input[type="password"]:focus { border-color: var(--border-hover); }
+        input[type="text"].has-icon { padding-left: 28px; }
+
+        .filter-count { font-size: 12px; color: var(--text-dim); white-space: nowrap; align-self: center; padding-bottom: 2px; }
+        .filter-count.active { color: var(--text-muted); }
+
+        .table-wrap {
+            margin-top: 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            background: var(--surface);
+        }
+        .table-scroll { overflow-x: auto; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead tr { background: var(--surface); }
+        th {
+            padding: 10px 12px;
+            text-align: left;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+        }
+        th.right { text-align: right; }
+        td { padding: 7px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+        .td-num    { font-variant-numeric: tabular-nums; color: var(--text-dim); font-size: 11px; text-align: right; }
+        .td-debit  { font-variant-numeric: tabular-nums; color: rgba(255,120,120,0.9); font-weight: 500; }
+        .td-credit { font-variant-numeric: tabular-nums; color: rgba(120,220,140,0.9); font-weight: 500; }
+        .td-balance{ font-variant-numeric: tabular-nums; color: var(--text-muted); }
+
+        td input {
+            width: 100%;
+            background: transparent;
+            border: 1px solid transparent;
+            color: inherit;
+            font-size: inherit;
+            font-family: inherit;
+            padding: 2px 4px;
+            border-radius: 6px;
+            outline: none;
+        }
+        td input:focus { border-color: var(--border-hover); background: rgba(255,255,255,0.03); }
+
+        .del-btn { background: none; border: none; color: transparent; cursor: pointer; font-size: 16px; padding: 0 4px; transition: 0.15s; }
+        tbody tr:hover .del-btn { color: var(--text-dim); }
+        .del-btn:hover { color: #fff !important; }
+
+        tfoot tr { background: var(--surface); border-top: 1px solid var(--border); }
+        tfoot td { padding: 10px 12px; font-size: 12px; color: var(--text-dim); font-weight: 600; }
+
+        .table-footer { padding: 10px 16px; border-top: 1px solid var(--border); }
+        .add-row-btn { background: none; border: none; color: var(--text-dim); font-size: 12px; cursor: pointer; font-family: inherit; padding: 0; }
+        .add-row-btn:hover { color: var(--text); }
+
+        mark { background: rgba(255,255,255,0.15); color: #fff; border-radius: 3px; padding: 0 2px; }
+
+        .panel {
+            margin-top: 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            background: var(--surface);
+        }
+        .panel.warn { border-color: rgba(255,200,80,0.2); }
+
+        .panel-toggle {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 13px;
+            font-family: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: left;
+            transition: 0.15s;
+        }
+        .panel-toggle:hover { color: var(--text); }
+        .panel-toggle .ml { margin-left: auto; font-size: 11px; color: var(--text-dim); }
+        .panel.warn .panel-toggle { color: rgba(255,200,80,0.8); }
+
+        .panel-body { padding: 0 16px 14px; }
+        .panel-desc { font-size: 12px; color: var(--text-dim); margin-bottom: 10px; }
+
+        .warn-line {
+            font-family: monospace;
+            font-size: 11px;
+            color: rgba(255,200,80,0.7);
+            background: rgba(255,200,80,0.06);
+            border-radius: 6px;
+            padding: 4px 8px;
+            margin-bottom: 4px;
+        }
+
+        pre.raw-lines {
+            background: #050505;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: rgba(120,220,140,0.8);
+            font-size: 11px;
+            font-family: monospace;
+            line-height: 1.6;
+            padding: 16px;
+            max-height: 280px;
+            overflow: auto;
+        }
+
+        /* ── Password modal ── */
+        .pwd-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.65);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            backdrop-filter: blur(4px);
+        }
+        .pwd-modal {
+            background: var(--surface);
+            border: 1px solid var(--border-hover);
+            border-radius: var(--radius-lg);
+            padding: 28px 32px;
+            width: 100%;
+            max-width: 360px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .pwd-title { font-size: 16px; font-weight: 700; color: var(--text); }
+        .pwd-hint  { font-size: 12px; color: var(--text-dim); margin-top: -6px; }
+        .pwd-error { font-size: 12px; color: rgba(255,120,120,0.9); }
+        .pwd-actions { display: flex; gap: 8px; margin-top: 4px; }
+        .pwd-actions .btn { flex: 1; justify-content: center; }
+
+        .page-footnote { margin-top: 40px; text-align: center; font-size: 12px; color: var(--text-dim); line-height: 2; }
+        .page-footnote span { color: var(--text-muted); }
+
+        .theme-toggle {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-dim);
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: 0.2s ease;
+            user-select: none;
+        }
+        .theme-toggle:hover { border-color: var(--border-hover); color: var(--text); }
+        .theme-toggle-icon  { font-size: 14px; }
+
+        /* Light mode */
+        [data-theme="light"] {
+            --bg:           #f5f5f5;
+            --surface:      #ffffff;
+            --border:       rgba(0,0,0,0.09);
+            --border-hover: rgba(0,0,0,0.22);
+            --text:         #0a0a0a;
+            --text-muted:   rgba(0,0,0,0.55);
+            --text-dim:     rgba(0,0,0,0.35);
+        }
+        [data-theme="light"] body { background: var(--bg); color: var(--text); }
+        [data-theme="light"] .drop-zone.drag   { border-color: rgba(0,0,0,0.3); background: rgba(0,0,0,0.02); }
+        [data-theme="light"] .drop-zone.loaded { border-color: rgba(0,0,0,0.2); }
+        [data-theme="light"] tbody tr:hover    { background: rgba(0,0,0,0.02); }
+        [data-theme="light"] td                { border-bottom-color: rgba(0,0,0,0.05); }
+        [data-theme="light"] td input:focus    { background: rgba(0,0,0,0.02); }
+        [data-theme="light"] .del-btn:hover    { color: #000 !important; }
+        [data-theme="light"] mark              { background: rgba(0,0,0,0.1); color: #000; }
+        [data-theme="light"] pre.raw-lines     { background: #f0f0f0; border-color: var(--border); color: #2a7a2a; }
+        [data-theme="light"] .panel.warn       { border-color: rgba(160,110,0,0.25); }
+        [data-theme="light"] .panel.warn .panel-toggle { color: rgba(140,90,0,0.9); }
+        [data-theme="light"] .warn-line        { color: rgba(140,90,0,0.8); background: rgba(200,140,0,0.08); }
+        [data-theme="light"] .banner.error     { border-color: rgba(0,0,0,0.2); color: rgba(0,0,0,0.85); }
+        [data-theme="light"] .td-debit         { color: #c0392b; }
+        [data-theme="light"] .td-credit        { color: #27ae60; }
+        [data-theme="light"] .pwd-overlay      { background: rgba(0,0,0,0.4); }
+    </style>
+</head>
+
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useCallback, useRef, useMemo } = React;
+
+// ── PDF extraction ─────────────────────────────────────────────────────────────
+
+async function extractItems(pdf, onPageDone) {
+    const allItems = [];
+    let yOffset = 0;
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page    = await pdf.getPage(i);
+        const vp      = page.getViewport({ scale: 1 });
+        const content = await page.getTextContent();
+
+        content.items.forEach(item => {
+            allItems.push({
+                str: item.str,
+                x:   item.transform[4],
+                y:   yOffset + (vp.height - item.transform[5]),
+            });
+        });
+
+        yOffset += vp.height + 20;
+        onPageDone(i, pdf.numPages);
+    }
+    return allItems;
+}
+
+function itemsToLines(items) {
+    const sorted = [...items].sort((a, b) =>
+        Math.abs(a.y - b.y) <= 3 ? a.x - b.x : a.y - b.y
+    );
+
+    const groups = [];
+    for (const item of sorted) {
+        const last = groups[groups.length - 1];
+        if (last && Math.abs(item.y - last.refY) <= 3) {
+            last.items.push(item);
+        } else {
+            groups.push({ refY: item.y, items: [item] });
+        }
+    }
+
+    return groups
+        .map(g => g.items.map(i => i.str).join(" ").trim())
+        .filter(Boolean);
+}
+
+// ── GoTyme parser ──────────────────────────────────────────────────────────────
+
+const MONTH_MAP = {
+    jan:1, feb:2, mar:3, apr:4, may:5, jun:6,
+    jul:7, aug:8, sep:9, oct:10, nov:11, dec:12,
+};
+
+const GOTYME_SKIP_BASE = [
+    /^30 Jellicoe/i,
+    /^www\.gotyme/i,
+    /^0860\s*999/i,
+    /^Bank Statement\s*$/i,
+    /^Date\s+Details/i,
+    /^Credits\s*\(\+\)/i,
+    /^Debits\s*\(-\)/i,
+    /^Running Balance/i,
+    /^Opening balance/i,
+    /^Total Credit/i,
+    /^Total Debit/i,
+    /^Total Fees/i,
+    /^Closing balance/i,
+    /^Summary\s*$/i,
+    /^All figures are in/i,
+    /^\*All bank fees/i,
+    /^Page \d/i,
+    /^You can contact/i,
+    /^GoTyme Bank/i,
+    /^Hotline:/i,
+    /^Email:/i,
+    /^Document ID/i,
+    /^Date requested/i,
+    /^service@gotyme/i,
+    /^Period:/i,
+    /^Account Number/i,
+    /^Current account\s*$/i,
+    /^GoalSave Account\s*$/i,
+    /^Verified\s*$/i,
+    /^[A-Z][A-Z\s]+$/,   // all-caps header lines (account holder name)
+    /e-Stamp/i,
+    /^Branch:/i,
+    /^R\d/,              // summary "R174.14" amounts on their own line
+    // Savings-specific
+    /^Interest rate/i,
+    /^\d+%\s*p\.a\./i,   // "6% p.a."
+    /^\d{1,2}\s+\w{3}\s+\d{4}\s+-\s+\d{1,2}\s+\w{3}\s+\d{4}/, // date range "01 Jul 2023 - 31 Dec 2023"
+];
+
+// Current account: Date | Details | Fees(-) | Credits(+) | Debits(-) | Balance
+const CURRENT_SKIP = [
+    ...GOTYME_SKIP_BASE,
+    /^Fees\*?\s*\(-\)/i,
+];
+
+// Savings account: Date | Details | Credits(+) | Debits(-) | Balance  (no fees col)
+const SAVINGS_SKIP = GOTYME_SKIP_BASE;
+
+const NUM = '([\\d,]+(?:\\.\\d+)?|R[\\d,]+(?:\\.\\d+)?|-)';
+const CURRENT_ROW_RE = new RegExp(
+    `^(\\d{1,2}\\s+[A-Za-z]{3}\\s+\\d{4})\\s+(.+?)\\s+${NUM}\\s+${NUM}\\s+${NUM}\\s+${NUM}$`
+);
+const SAVINGS_ROW_RE = new RegExp(
+    `^(\\d{1,2}\\s+[A-Za-z]{3}\\s+\\d{4})\\s+(.+?)\\s+${NUM}\\s+${NUM}\\s+${NUM}$`
+);
+
+function detectStatementType(lines) {
+    for (const l of lines) {
+        if (/GoalSave Account/i.test(l)) return "savings";
+        if (/Current account/i.test(l))  return "current";
+    }
+    return "current";
+}
+
+function parseGoTymeDate(str) {
+    const parts = str.trim().split(/\s+/);
+    const day  = parts[0].padStart(2, "0");
+    const mon  = String(MONTH_MAP[parts[1].toLowerCase().slice(0, 3)] || 1).padStart(2, "0");
+    const year = parts[2];
+    return `${mon}/${day}/${year}`;
+}
+
+function parseAmt(str) {
+    if (!str || str === "-") return "";
+    const v = parseFloat(str.replace(/^R/, "").replace(/,/g, ""));
+    return isNaN(v) ? "" : v.toFixed(2);
+}
+
+function parseCurrent(lines) {
+    const transactions = [];
+    const warnings     = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line || CURRENT_SKIP.some(p => p.test(line))) continue;
+
+        const m = line.match(CURRENT_ROW_RE);
+        if (m) {
+            let desc = m[2].trim();
+
+            let j = i + 1;
+            while (j < lines.length) {
+                const next = lines[j];
+                if (!next || CURRENT_SKIP.some(p => p.test(next)) || next.match(CURRENT_ROW_RE)) break;
+                if (/^\d{1,2}\s+[A-Za-z]{3}\s+\d{4}/.test(next)) break;
+                desc += " " + next.trim();
+                j++;
+            }
+            i = j - 1;
+
+            const feeAmt = parseAmt(m[3]);
+            const credit = parseAmt(m[4]);
+            const debAmt = parseAmt(m[5]);
+            const balance = parseAmt(m[6]) || "0.00";
+            const debitTotal = (parseFloat(feeAmt) || 0) + (parseFloat(debAmt) || 0);
+
+            transactions.push({
+                date: parseGoTymeDate(m[1]),
+                description: desc,
+                debit:   debitTotal > 0 ? debitTotal.toFixed(2) : "",
+                credit,
+                balance,
+            });
+            continue;
+        }
+
+        if (/[\d,]+\.?\d*/.test(line) && !/^R\d/.test(line)) warnings.push(line);
+    }
+
+    return { transactions, warnings };
+}
+
+function parseSavings(lines) {
+    const transactions = [];
+    const warnings     = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line || SAVINGS_SKIP.some(p => p.test(line))) continue;
+
+        const m = line.match(SAVINGS_ROW_RE);
+        if (m) {
+            let desc = m[2].trim();
+
+            let j = i + 1;
+            while (j < lines.length) {
+                const next = lines[j];
+                if (!next || SAVINGS_SKIP.some(p => p.test(next)) || next.match(SAVINGS_ROW_RE)) break;
+                if (/^\d{1,2}\s+[A-Za-z]{3}\s+\d{4}/.test(next)) break;
+                desc += " " + next.trim();
+                j++;
+            }
+            i = j - 1;
+
+            const credit  = parseAmt(m[3]);
+            const debit   = parseAmt(m[4]);
+            const balance = parseAmt(m[5]) || "0.00";
+
+            transactions.push({
+                date: parseGoTymeDate(m[1]),
+                description: desc,
+                debit,
+                credit,
+                balance,
+            });
+            continue;
+        }
+
+        if (/[\d,]+\.?\d*/.test(line) && !/^R\d/.test(line)) warnings.push(line);
+    }
+
+    return { transactions, warnings };
+}
+
+function parseGoTyme(lines) {
+    const type = detectStatementType(lines);
+    const result = type === "savings" ? parseSavings(lines) : parseCurrent(lines);
+    return { ...result, type };
+}
+
+// ── Date helpers ───────────────────────────────────────────────────────────────
+
+function parseRowDate(str) {
+    if (!str) return null;
+    const [mm, dd, yyyy] = str.split("/").map(Number);
+    if (!mm || !dd || !yyyy) return null;
+    return new Date(yyyy, mm - 1, dd);
+}
+
+function parseDateInput(str) {
+    if (!str) return null;
+    const [y, m, d] = str.split("-").map(Number);
+    return new Date(y, m - 1, d);
+}
+
+// ── CSV ────────────────────────────────────────────────────────────────────────
+
+function toCSV(rows) {
+    return [
+        ["Date", "Description", "Debit", "Credit", "Balance"].join(","),
+        ...rows.map(r =>
+            [
+                r.date,
+                `"${(r.description || "").replace(/"/g, '""')}"`,
+                r.debit,
+                r.credit,
+                r.balance,
+            ].join(",")
+        ),
+    ].join("\n");
+}
+
+function fmtR(n) {
+    const v = parseFloat(n);
+    return isNaN(v)
+        ? "0.00"
+        : Math.abs(v).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function highlight(text, term) {
+    if (!term) return text;
+    const idx = text.toLowerCase().indexOf(term.toLowerCase());
+    if (idx === -1) return text;
+    return (
+        <>
+            {text.slice(0, idx)}
+            <mark>{text.slice(idx, idx + term.length)}</mark>
+            {text.slice(idx + term.length)}
+        </>
+    );
+}
+
+// ── UI components ──────────────────────────────────────────────────────────────
+
+function PasswordModal({ incorrect, onSubmit, onCancel }) {
+    const [value, setValue] = useState("");
+    const inputRef = useRef();
+
+    React.useEffect(() => { inputRef.current?.focus(); }, []);
+
+    function submit() {
+        if (value.trim()) onSubmit(value.trim());
+    }
+
+    return (
+        <div className="pwd-overlay" onClick={e => e.target === e.currentTarget && onCancel()}>
+            <div className="pwd-modal">
+                <div className="pwd-title">🔒 Password-protected PDF</div>
+                <div className="pwd-hint">GoTyme statements use your SA ID number as the password.</div>
+                {incorrect && <div className="pwd-error">Incorrect password — try again.</div>}
+                <input
+                    ref={inputRef}
+                    type="password"
+                    placeholder="Enter ID number"
+                    value={value}
+                    onChange={e => setValue(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && submit()}
+                />
+                <div className="pwd-actions">
+                    <button className="btn primary" onClick={submit} disabled={!value.trim()}>
+                        Unlock
+                    </button>
+                    <button className="btn ghost" onClick={onCancel}>Cancel</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function DropZone({ onFile, fileName }) {
+    const [dragOver, setDragOver] = useState(false);
+    const inputRef = useRef();
+
+    const accept = useCallback(f => {
+        if (f && f.type === "application/pdf") onFile(f);
+    }, [onFile]);
+
+    return (
+        <div
+            onDrop={e => { e.preventDefault(); setDragOver(false); accept(e.dataTransfer.files[0]); }}
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onClick={() => inputRef.current.click()}
+            className={`drop-zone${dragOver ? " drag" : ""}${fileName ? " loaded" : ""}`}
+        >
+            <input
+                ref={inputRef}
+                type="file"
+                accept="application/pdf"
+                style={{display:"none"}}
+                onChange={e => accept(e.target.files[0])}
+            />
+            {fileName ? (
+                <>
+                    <div className="drop-zone-icon">✓</div>
+                    <p className="drop-zone-main">{fileName}</p>
+                    <p className="drop-zone-sub">Click to change file</p>
+                </>
+            ) : (
+                <>
+                    <div className="drop-zone-icon">📄</div>
+                    <p className="drop-zone-main">
+                        Drop a PDF here or <span className="drop-zone-link">browse</span>
+                    </p>
+                    <p className="drop-zone-sub">GoTyme Current Account or GoalSave · Password-protected PDFs supported</p>
+                </>
+            )}
+        </div>
+    );
+}
+
+function StatsBar({ rows }) {
+    const totalDebit  = rows.reduce((s, r) => s + (parseFloat(r.debit)  || 0), 0);
+    const totalCredit = rows.reduce((s, r) => s + (parseFloat(r.credit) || 0), 0);
+    const net         = totalCredit - totalDebit;
+
+    return (
+        <div className="stats-grid">
+            <Stat label="Transactions"  value={rows.length}         prefix=""   />
+            <Stat label="Total Debits"  value={fmtR(totalDebit)}    prefix="R " />
+            <Stat label="Total Credits" value={fmtR(totalCredit)}   prefix="R " />
+            <Stat label="Net"           value={fmtR(Math.abs(net))} prefix={net < 0 ? "−R " : "R "} />
+        </div>
+    );
+}
+
+function Stat({ label, value, prefix }) {
+    return (
+        <div className="stat-box">
+            <div className="stat-label">{label}</div>
+            <div className="stat-value">{prefix}{value}</div>
+        </div>
+    );
+}
+
+function FilterBar({ search, onSearch, dateFrom, dateTo, onDateFrom, onDateTo, onClear, total, showing }) {
+    const active = search || dateFrom || dateTo;
+    return (
+        <div className="filter-bar">
+            <div className="filter-group">
+                <label className="filter-label">Search description</label>
+                <div className="filter-input-wrap">
+                    <span className="filter-icon">🔍</span>
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={e => onSearch(e.target.value)}
+                        placeholder="e.g. EFT, GoalSave…"
+                        className="has-icon"
+                    />
+                    {search && (
+                        <button className="filter-clear-x" onClick={() => onSearch("")}>×</button>
+                    )}
+                </div>
+            </div>
+
+            <div className="filter-group" style={{flex:"0 0 auto", minWidth:"140px"}}>
+                <label className="filter-label">From</label>
+                <input type="date" value={dateFrom} onChange={e => onDateFrom(e.target.value)} />
+            </div>
+
+            <div className="filter-group" style={{flex:"0 0 auto", minWidth:"140px"}}>
+                <label className="filter-label">To</label>
+                <input type="date" value={dateTo} onChange={e => onDateTo(e.target.value)} />
+            </div>
+
+            <div style={{display:"flex", alignItems:"center", gap:"8px", paddingBottom:"2px"}}>
+                {active ? (
+                    <>
+                        <span className={`filter-count${showing < total ? " active" : ""}`}>
+                            {showing} / {total}
+                        </span>
+                        <button className="btn ghost" style={{padding:"6px 12px"}} onClick={onClear}>
+                            Clear
+                        </button>
+                    </>
+                ) : (
+                    <span className="filter-count">{total} row{total !== 1 ? "s" : ""}</span>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function TransactionTable({ entries, onDelete, onAddRow, onChange, search }) {
+    const fields  = ["date", "description", "debit", "credit", "balance"];
+    const headers = ["Date", "Description", "Debit", "Credit", "Balance"];
+
+    const totalDebit  = entries.reduce((s, { row: r }) => s + (parseFloat(r.debit)  || 0), 0);
+    const totalCredit = entries.reduce((s, { row: r }) => s + (parseFloat(r.credit) || 0), 0);
+
+    return (
+        <div className="table-wrap">
+            <div className="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th className="right" style={{width:"36px"}}>#</th>
+                            {headers.map(h => <th key={h}>{h}</th>)}
+                            <th style={{width:"32px"}}></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {entries.map(({ row: r, idx }) => (
+                            <tr key={idx}>
+                                <td className="td-num">{idx + 1}</td>
+                                {fields.map(f => (
+                                    <td key={f}>
+                                        {f === "description" ? (
+                                            <div style={{padding:"2px 4px", fontSize:"13px"}}>
+                                                {highlight(r[f] || "", search)}
+                                            </div>
+                                        ) : (
+                                            <input
+                                                value={r[f] || ""}
+                                                onChange={e => onChange(idx, f, e.target.value)}
+                                                className={
+                                                    f === "debit"   && r.debit  ? "td-debit"   :
+                                                    f === "credit"  && r.credit ? "td-credit"  :
+                                                    f === "balance"             ? "td-balance"  : ""
+                                                }
+                                            />
+                                        )}
+                                    </td>
+                                ))}
+                                <td style={{textAlign:"center"}}>
+                                    <button className="del-btn" onClick={() => onDelete(idx)} title="Delete row">×</button>
+                                </td>
+                            </tr>
+                        ))}
+                        {entries.length === 0 && (
+                            <tr>
+                                <td colSpan={7} style={{textAlign:"center", padding:"40px", color:"var(--text-dim)"}}>
+                                    No transactions match your filters.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td></td>
+                            <td colSpan={2} style={{textAlign:"right", fontSize:"10px", textTransform:"uppercase", letterSpacing:"0.08em"}}>Totals</td>
+                            <td className="td-debit">R {fmtR(totalDebit)}</td>
+                            <td className="td-credit">R {fmtR(totalCredit)}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div className="table-footer">
+                <button className="add-row-btn" onClick={onAddRow}>+ Add row</button>
+            </div>
+        </div>
+    );
+}
+
+function WarningsPanel({ warnings }) {
+    const [open, setOpen] = useState(true);
+    if (!warnings.length) return null;
+    return (
+        <div className="panel warn">
+            <button className="panel-toggle" onClick={() => setOpen(o => !o)}>
+                <span>⚠</span>
+                <span>{warnings.length} incomplete row{warnings.length !== 1 ? "s" : ""} skipped</span>
+                <span className="ml">{open ? "▲ hide" : "▼ show"}</span>
+            </button>
+            {open && (
+                <div className="panel-body">
+                    <p className="panel-desc">
+                        Lines found in PDF that couldn't be parsed as complete transactions.
+                    </p>
+                    {warnings.map((w, i) => (
+                        <div key={i} className="warn-line">{w}</div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function RawLinesPanel({ lines }) {
+    const [open, setOpen] = useState(false);
+    if (!lines.length) return null;
+    return (
+        <div className="panel" style={{marginTop:"16px"}}>
+            <button className="panel-toggle" onClick={() => setOpen(o => !o)}>
+                <span>{open ? "▼" : "▶"}</span>
+                <span>Raw PDF lines ({lines.length})</span>
+                <span className="ml">expand to diagnose parsing</span>
+            </button>
+            {open && (
+                <div className="panel-body">
+                    <pre className="raw-lines">
+                        {lines.map((l, i) => `${String(i + 1).padStart(4)} │ ${l}`).join("\n")}
+                    </pre>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── App ────────────────────────────────────────────────────────────────────────
+
+function App() {
+    const [file,          setFile]          = useState(null);
+    const [rows,          setRows]          = useState([]);
+    const [status,        setStatus]        = useState("");
+    const [busy,          setBusy]          = useState(false);
+    const [progress,      setProgress]      = useState({ current: 0, total: 0 });
+    const [error,         setError]         = useState("");
+    const [rawLines,      setRawLines]      = useState([]);
+    const [warnings,      setWarnings]      = useState([]);
+    const [copied,        setCopied]        = useState(false);
+    const [resetKey,      setResetKey]      = useState(0);
+    const [passwordPrompt, setPasswordPrompt] = useState(null); // { callback, incorrect }
+    const [theme, setTheme] = useState(() => localStorage.getItem("sf-theme") || "dark");
+
+    React.useEffect(() => {
+        document.documentElement.setAttribute("data-theme", theme);
+        localStorage.setItem("sf-theme", theme);
+    }, [theme]);
+
+    const [search,   setSearch]   = useState("");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo,   setDateTo]   = useState("");
+
+    const filteredEntries = useMemo(() => {
+        const from = parseDateInput(dateFrom);
+        const to   = parseDateInput(dateTo);
+
+        return rows
+            .map((row, idx) => ({ row, idx }))
+            .filter(({ row }) => {
+                if (search && !row.description.toLowerCase().includes(search.toLowerCase())) return false;
+                if (from || to) {
+                    const d = parseRowDate(row.date);
+                    if (!d) return true;
+                    if (from && d < from) return false;
+                    if (to) {
+                        const toEnd = new Date(to); toEnd.setHours(23, 59, 59, 999);
+                        if (d > toEnd) return false;
+                    }
+                }
+                return true;
+            });
+    }, [rows, search, dateFrom, dateTo]);
+
+    const filteredRows  = filteredEntries.map(e => e.row);
+    const filtersActive = !!(search || dateFrom || dateTo);
+
+    // Stored PDF buffer for re-attempting with password
+    const pdfBufferRef = useRef(null);
+
+    async function loadPdf(buffer) {
+        setBusy(true);
+        setError("");
+        setRawLines([]);
+        setWarnings([]);
+        setStatus("Loading PDF…");
+        setProgress({ current: 0, total: 0 });
+
+        try {
+            const loadingTask = pdfjsLib.getDocument({ data: buffer });
+
+            loadingTask.onPassword = (callback, reason) => {
+                setBusy(false);
+                setStatus("");
+                setPasswordPrompt({ callback, incorrect: reason === 2 });
+            };
+
+            const pdf = await loadingTask.promise;
+
+            setProgress({ current: 0, total: pdf.numPages });
+
+            const allItems = await extractItems(pdf, (current, total) => {
+                setProgress({ current, total });
+                setStatus(`Reading page ${current} of ${total}…`);
+            });
+
+            const lines = itemsToLines(allItems);
+            setRawLines(lines);
+            setStatus("Parsing transactions…");
+
+            const { transactions, warnings, type } = parseGoTyme(lines);
+            setWarnings(warnings);
+
+            if (transactions.length === 0) {
+                throw new Error(
+                    "No transactions found. Expand 'Raw PDF lines' below to inspect what was extracted."
+                );
+            }
+
+            setRows(transactions);
+            setSearch(""); setDateFrom(""); setDateTo("");
+            const typeLabel = type === "savings" ? "GoalSave / Savings" : "Current Account";
+            setStatus(`✓ ${transactions.length} transaction${transactions.length !== 1 ? "s" : ""} extracted  ·  ${typeLabel}`);
+        } catch (e) {
+            // Password errors are handled via onPassword callback; ignore PasswordException here
+            if (e.name !== "PasswordException") {
+                setError(e.message);
+                setRows([]);
+            }
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    async function extract() {
+        if (!file) return;
+        const buffer = await file.arrayBuffer();
+        pdfBufferRef.current = buffer;
+        await loadPdf(buffer);
+    }
+
+    function handlePasswordSubmit(pwd) {
+        setPasswordPrompt(null);
+        if (passwordPrompt?.callback) {
+            setBusy(true);
+            setStatus("Unlocking PDF…");
+            passwordPrompt.callback(pwd);
+        }
+    }
+
+    function handlePasswordCancel() {
+        setPasswordPrompt(null);
+        setStatus("");
+        setBusy(false);
+    }
+
+    function downloadCSV() {
+        const exportRows = filtersActive ? filteredRows : rows;
+        const blob = new Blob([toCSV(exportRows)], { type: "text/csv" });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement("a");
+        a.href     = url;
+        a.download = (file?.name || "statement").replace(/\.pdf$/i, "") +
+                     (filtersActive ? "_filtered" : "") + ".csv";
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    async function copyCSV() {
+        try {
+            const exportRows = filtersActive ? filteredRows : rows;
+            await navigator.clipboard.writeText(toCSV(exportRows));
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            setError("Clipboard access denied — use Download instead.");
+        }
+    }
+
+    function handleChange(originalIdx, field, value) {
+        setRows(prev => prev.map((r, i) => i === originalIdx ? { ...r, [field]: value } : r));
+    }
+
+    function handleDelete(originalIdx) {
+        setRows(prev => prev.filter((_, i) => i !== originalIdx));
+    }
+
+    function handleAddRow() {
+        setRows(prev => [...prev, { date: "", description: "", debit: "", credit: "", balance: "" }]);
+    }
+
+    function handleFileSelected(f) {
+        setFile(f);
+        setRows([]);
+        setError("");
+        setStatus("");
+        setRawLines([]);
+        setWarnings([]);
+        setPasswordPrompt(null);
+        setSearch(""); setDateFrom(""); setDateTo("");
+    }
+
+    function handleReset() {
+        handleFileSelected(null);
+        setResetKey(k => k + 1);
+        pdfBufferRef.current = null;
+    }
+
+    const hasData = rows.length > 0;
+
+    return (
+        <div className="page-wrap">
+
+            {passwordPrompt && (
+                <PasswordModal
+                    incorrect={passwordPrompt.incorrect}
+                    onSubmit={handlePasswordSubmit}
+                    onCancel={handlePasswordCancel}
+                />
+            )}
+
+            <div className="top-nav">
+                <a href="index.html">StatementFlow</a>
+                <span className="top-nav-sep">›</span>
+                <span style={{color:"var(--text-muted)"}}>GoTyme Converter</span>
+                <button className="theme-toggle" onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}>
+                    <span className="theme-toggle-icon">{theme === "dark" ? "☀" : "☾"}</span>
+                    {theme === "dark" ? "Light" : "Dark"}
+                </button>
+            </div>
+
+            <div className="page-header">
+                <div className="page-title">
+                    <h2>PDF → CSV</h2>
+                </div>
+                <p className="page-subtitle">Transform your GoTyme Bank statement into clean, structured data — instantly. Password-protected PDFs supported.</p>
+            </div>
+
+            <DropZone key={resetKey} onFile={handleFileSelected} fileName={file?.name} />
+
+            <div className="action-row">
+                <button
+                    className="btn primary"
+                    onClick={extract}
+                    disabled={!file || busy}
+                >
+                    {busy ? `Processing ${progress.current}/${progress.total}…` : "Extract transactions"}
+                </button>
+
+                {hasData && (
+                    <>
+                        <button className="btn" onClick={downloadCSV}>
+                            ↓ {filtersActive ? "Download filtered CSV" : "Download CSV"}
+                        </button>
+                        <button className="btn" onClick={copyCSV}>
+                            {copied ? "✓ Copied!" : filtersActive ? "Copy filtered CSV" : "Copy CSV"}
+                        </button>
+                    </>
+                )}
+
+                {(file || hasData) && (
+                    <button className="btn ghost push" onClick={handleReset}>Clear</button>
+                )}
+            </div>
+
+            {status && !error && <div className="banner">{status}</div>}
+            {error  && <div className="banner error">⚠ {error}</div>}
+
+            {hasData && <StatsBar rows={filteredRows} />}
+            {hasData && <WarningsPanel warnings={warnings} />}
+            {hasData && (
+                <FilterBar
+                    search={search}       onSearch={setSearch}
+                    dateFrom={dateFrom}   onDateFrom={setDateFrom}
+                    dateTo={dateTo}       onDateTo={setDateTo}
+                    onClear={() => { setSearch(""); setDateFrom(""); setDateTo(""); }}
+                    total={rows.length}
+                    showing={filteredEntries.length}
+                />
+            )}
+            {hasData && (
+                <TransactionTable
+                    entries={filteredEntries}
+                    search={search}
+                    onChange={handleChange}
+                    onDelete={handleDelete}
+                    onAddRow={handleAddRow}
+                />
+            )}
+
+            <RawLinesPanel lines={rawLines} />
+
+            <div className="page-footnote">
+                <p>Runs entirely in your browser — no data is uploaded anywhere.</p>
+                <p>StatementFlow is developed by <span>Lethu Langa</span></p>
+            </div>
+        </div>
+    );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
