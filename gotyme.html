@@ -351,6 +351,7 @@ async function extractItems(pdf, onPageDone) {
                 str: item.str,
                 x:   item.transform[4],
                 y:   yOffset + (vp.height - item.transform[5]),
+                rot: item.transform[1], // non-zero = rotated (watermark)
             });
         });
 
@@ -958,7 +959,9 @@ function App() {
                 setStatus(`Reading page ${current} of ${total}…`);
             });
 
-            const lines = itemsToLines(allItems);
+            // ponytail: filter diagonal watermark — rotated items have non-zero transform[1]
+            const straightItems = allItems.filter(it => Math.abs(it.rot) < 0.5);
+            const lines = itemsToLines(straightItems);
             setRawLines(lines);
             setStatus("Parsing transactions…");
 
