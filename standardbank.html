@@ -16,12 +16,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script type="text/babel" src="asset/shared.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc =
             "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="styles/system.css">
@@ -324,8 +326,6 @@
 <div id="root"></div>
 
 <script type="text/babel">
-const { useState, useCallback, useRef, useMemo } = React;
-
 // ── PDF extraction ────────────────────────────────────────────────────────────
 
 async function extractItems(pdf, onPageDone) {
@@ -502,303 +502,6 @@ function parseStandardBank(lines, period) {
     return { transactions, warnings };
 }
 
-// ── Date helpers ──────────────────────────────────────────────────────────────
-
-/** Parse MM/DD/YYYY → Date (local) */
-function parseRowDate(str) {
-    if (!str) return null;
-    const [mm, dd, yyyy] = str.split("/").map(Number);
-    if (!mm || !dd || !yyyy) return null;
-    return new Date(yyyy, mm - 1, dd);
-}
-
-/** Parse YYYY-MM-DD (from <input type="date">) → Date (local) */
-function parseDateInput(str) {
-    if (!str) return null;
-    const [y, m, d] = str.split("-").map(Number);
-    return new Date(y, m - 1, d);
-}
-
-// ── CSV ───────────────────────────────────────────────────────────────────────
-
-function toCSV(rows) {
-    return [
-        ["Date", "Description", "Debit", "Credit", "Balance"].join(","),
-        ...rows.map(r =>
-            [
-                r.date,
-                `"${(r.description || "").replace(/"/g, '""')}"`,
-                r.debit,
-                r.credit,
-                r.balance,
-            ].join(",")
-        ),
-    ].join("\n");
-}
-
-function fmtR(n) {
-    const v = parseFloat(n);
-    return isNaN(v)
-        ? "0.00"
-        : Math.abs(v).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-/** Wrap matched substring in a <mark> for highlighting */
-function highlight(text, term) {
-    if (!term) return text;
-    const idx = text.toLowerCase().indexOf(term.toLowerCase());
-    if (idx === -1) return text;
-    return (
-        <>
-            {text.slice(0, idx)}
-            <mark>{text.slice(idx, idx + term.length)}</mark>
-            {text.slice(idx + term.length)}
-        </>
-    );
-}
-
-// ── UI components ─────────────────────────────────────────────────────────────
-
-function DropZone({ onFile, fileName }) {
-    const [dragOver, setDragOver] = useState(false);
-    const inputRef = useRef();
-
-    const accept = useCallback(f => {
-        if (f && f.type === "application/pdf") onFile(f);
-    }, [onFile]);
-
-    return (
-        <div
-            onDrop={e => { e.preventDefault(); setDragOver(false); accept(e.dataTransfer.files[0]); }}
-            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onClick={() => inputRef.current.click()}
-            className={`drop-zone${dragOver ? " drag" : ""}${fileName ? " loaded" : ""}`}
-        >
-            <input
-                ref={inputRef}
-                type="file"
-                accept="application/pdf"
-                style={{display:"none"}}
-                onChange={e => accept(e.target.files[0])}
-            />
-            {fileName ? (
-                <>
-                    <div className="drop-zone-icon">✓</div>
-                    <p className="drop-zone-main">{fileName}</p>
-                    <p className="drop-zone-sub">Click to change file</p>
-                </>
-            ) : (
-                <>
-                    <div className="drop-zone-icon">📄</div>
-                    <p className="drop-zone-main">
-                        Drop a PDF here or <span className="drop-zone-link">browse</span>
-                    </p>
-                    <p className="drop-zone-sub">Standard Bank MyMoBiz statement</p>
-                </>
-            )}
-        </div>
-    );
-}
-
-function StatsBar({ rows }) {
-    const totalDebit  = rows.reduce((s, r) => s + (parseFloat(r.debit)  || 0), 0);
-    const totalCredit = rows.reduce((s, r) => s + (parseFloat(r.credit) || 0), 0);
-    const net         = totalCredit - totalDebit;
-
-    return (
-        <div className="stats-grid">
-            <Stat label="Transactions"  value={rows.length}       prefix=""   />
-            <Stat label="Total Debits"  value={fmtR(totalDebit)}  prefix="R " />
-            <Stat label="Total Credits" value={fmtR(totalCredit)} prefix="R " />
-            <Stat label="Net"           value={fmtR(Math.abs(net))} prefix={net < 0 ? "−R " : "R "} />
-        </div>
-    );
-}
-
-function Stat({ label, value, prefix }) {
-    return (
-        <div className="stat-box">
-            <div className="stat-label">{label}</div>
-            <div className="stat-value">{prefix}{value}</div>
-        </div>
-    );
-}
-
-function FilterBar({ search, onSearch, dateFrom, dateTo, onDateFrom, onDateTo, onClear, total, showing }) {
-    const active = search || dateFrom || dateTo;
-    return (
-        <div className="filter-bar">
-            {/* Search */}
-            <div className="filter-group">
-                <label className="filter-label">Search description</label>
-                <div className="filter-input-wrap">
-                    <span className="filter-icon">🔍</span>
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={e => onSearch(e.target.value)}
-                        placeholder="e.g. CANVA, PAYSHAP…"
-                        className="has-icon"
-                    />
-                    {search && (
-                        <button className="filter-clear-x" onClick={() => onSearch("")}>×</button>
-                    )}
-                </div>
-            </div>
-
-            {/* Date from */}
-            <div className="filter-group" style={{flex:"0 0 auto", minWidth:"140px"}}>
-                <label className="filter-label">From</label>
-                <input type="date" value={dateFrom} onChange={e => onDateFrom(e.target.value)} />
-            </div>
-
-            {/* Date to */}
-            <div className="filter-group" style={{flex:"0 0 auto", minWidth:"140px"}}>
-                <label className="filter-label">To</label>
-                <input type="date" value={dateTo} onChange={e => onDateTo(e.target.value)} />
-            </div>
-
-            {/* Count + clear */}
-            <div style={{display:"flex", alignItems:"center", gap:"8px", paddingBottom:"2px"}}>
-                {active ? (
-                    <>
-                        <span className={`filter-count${showing < total ? " active" : ""}`}>
-                            {showing} / {total}
-                        </span>
-                        <button className="btn ghost" style={{padding:"6px 12px"}} onClick={onClear}>
-                            Clear
-                        </button>
-                    </>
-                ) : (
-                    <span className="filter-count">{total} row{total !== 1 ? "s" : ""}</span>
-                )}
-            </div>
-        </div>
-    );
-}
-function TransactionTable({ entries, onDelete, onAddRow, onChange, search }) {
-    const fields  = ["date", "description", "debit", "credit", "balance"];
-    const headers = ["Date", "Description", "Debit", "Credit", "Balance"];
-
-    const totalDebit  = entries.reduce((s, { row: r }) => s + (parseFloat(r.debit)  || 0), 0);
-    const totalCredit = entries.reduce((s, { row: r }) => s + (parseFloat(r.credit) || 0), 0);
-
-    return (
-        <div className="table-wrap">
-            <div className="table-scroll">
-                <table>
-                    <thead>
-                        <tr>
-                            <th className="right" style={{width:"36px"}}>#</th>
-                            {headers.map(h => <th key={h}>{h}</th>)}
-                            <th style={{width:"32px"}}></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {entries.map(({ row: r, idx }) => (
-                            <tr key={idx} className="group">
-                                <td className="td-num">{idx + 1}</td>
-                                {fields.map(f => (
-                                    <td key={f}>
-                                        {f === "description" ? (
-                                            <div style={{padding:"2px 4px", fontSize:"13px"}}>
-                                                {highlight(r[f] || "", search)}
-                                            </div>
-                                        ) : (
-                                            <input
-                                                value={r[f] || ""}
-                                                onChange={e => onChange(idx, f, e.target.value)}
-                                                className={
-                                                    f === "debit"   && r.debit  ? "td-debit"   :
-                                                    f === "credit"  && r.credit ? "td-credit"  :
-                                                    f === "balance"             ? "td-balance"  : ""
-                                                }
-                                            />
-                                        )}
-                                    </td>
-                                ))}
-                                <td style={{textAlign:"center"}}>
-                                    <button
-                                        className="del-btn"
-                                        onClick={() => onDelete(idx)}
-                                        title="Delete row"
-                                    >×</button>
-                                </td>
-                            </tr>
-                        ))}
-                        {entries.length === 0 && (
-                            <tr>
-                                <td colSpan={7} style={{textAlign:"center", padding:"40px", color:"var(--text-dim)"}}>
-                                    No transactions match your filters.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td></td>
-                            <td colSpan={2} style={{textAlign:"right", fontSize:"10px", textTransform:"uppercase", letterSpacing:"0.08em"}}>Totals</td>
-                            <td className="td-debit">R {fmtR(totalDebit)}</td>
-                            <td className="td-credit">R {fmtR(totalCredit)}</td>
-                            <td></td>
-                            <td></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-            <div className="table-footer">
-                <button className="add-row-btn" onClick={onAddRow}>+ Add row</button>
-            </div>
-        </div>
-    );
-}
-
-function WarningsPanel({ warnings }) {
-    const [open, setOpen] = useState(true);
-    if (!warnings.length) return null;
-    return (
-        <div className="panel warn">
-            <button className="panel-toggle" onClick={() => setOpen(o => !o)}>
-                <span>⚠</span>
-                <span>{warnings.length} incomplete row{warnings.length !== 1 ? "s" : ""} skipped</span>
-                <span className="ml">{open ? "▲ hide" : "▼ show"}</span>
-            </button>
-            {open && (
-                <div className="panel-body">
-                    <p className="panel-desc">
-                        These lines were found in the PDF but couldn't be parsed as complete transactions (missing date or balance).
-                    </p>
-                    {warnings.map((w, i) => (
-                        <div key={i} className="warn-line">{w}</div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-}
-
-function RawLinesPanel({ lines }) {
-    const [open, setOpen] = useState(false);
-    if (!lines.length) return null;
-    return (
-        <div className="panel" style={{marginTop:"16px"}}>
-            <button className="panel-toggle" onClick={() => setOpen(o => !o)}>
-                <span>{open ? "▼" : "▶"}</span>
-                <span>Raw PDF lines ({lines.length})</span>
-                <span className="ml">expand to diagnose parsing</span>
-            </button>
-            {open && (
-                <div className="panel-body">
-                    <pre className="raw-lines">
-                        {lines.map((l, i) => `${String(i + 1).padStart(4)} │ ${l}`).join("\n")}
-                    </pre>
-                </div>
-            )}
-        </div>
-    );
-}
-
 // ── App ───────────────────────────────────────────────────────────────────────
 
 function App() {
@@ -968,7 +671,7 @@ function App() {
                 <span className="top-nav-sep">›</span>
                 <span style={{color:"var(--text-muted)"}}>Standard Bank Converter</span>
                 <button className="theme-toggle" onClick={toggleTheme}>
-                    <span className="theme-toggle-icon">{theme === "dark" ? "☀" : "☾"}</span>
+                    <span className="theme-toggle-icon">{theme === "dark" ? <i className="ph ph-sun"></i> : <i className="ph ph-moon"></i>}</span>
                     {theme === "dark" ? "Light" : "Dark"}
                 </button>
             </div>
@@ -983,7 +686,7 @@ function App() {
                 <p className="page-subtitle">Transform your Standard Bank statement into clean, structured data - instantly.</p>
             </div>
 
-            <DropZone key={resetKey} onFile={handleFileSelected} fileName={file?.name} />
+            <DropZone key={resetKey} onFile={handleFileSelected} fileName={file?.name} subtitle="Standard Bank MyMoBiz statement" />
 
             {/* Action buttons */}
             <div className="action-row">
@@ -998,10 +701,10 @@ function App() {
                 {hasData && (
                     <>
                         <button className="btn" onClick={downloadCSV}>
-                            ↓ {filtersActive ? "Download filtered CSV" : "Download CSV"}
+                            <i className="ph ph-download-simple"></i> {filtersActive ? "Download filtered CSV" : "Download CSV"}
                         </button>
                         <button className="btn" onClick={copyCSV}>
-                            {copied ? "✓ Copied!" : filtersActive ? "Copy filtered CSV" : "Copy CSV"}
+                            {copied ? <><i className="ph ph-check"></i> Copied!</> : filtersActive ? "Copy filtered CSV" : "Copy CSV"}
                         </button>
                     </>
                 )}
@@ -1012,11 +715,11 @@ function App() {
             </div>
 
             {/* Status / error */}
-            {status && !error && <div className="banner">{status}</div>}
-            {error && <div className="banner error">⚠ {error}</div>}
+            {status && !error && <div className="banner">{status.startsWith("✓ ") ? <><i className="ph ph-check-circle"></i> {status.slice(2)}</> : status}</div>}
+            {error && <div className="banner error"><i className="ph ph-warning"></i> {error}</div>}
 
             {hasData && <StatsBar rows={filteredRows} />}
-            {hasData && <WarningsPanel warnings={warnings} />}
+            {hasData && <WarningsPanel warnings={warnings} description="These lines were found in the PDF but couldn't be parsed as complete transactions (missing date or balance)." />}
             {hasData && (
                 <FilterBar
                     search={search}       onSearch={setSearch}
@@ -1025,6 +728,7 @@ function App() {
                     onClear={() => { setSearch(""); setDateFrom(""); setDateTo(""); }}
                     total={rows.length}
                     showing={filteredEntries.length}
+                    searchPlaceholder="e.g. CANVA, PAYSHAP…"
                 />
             )}
             {hasData && (

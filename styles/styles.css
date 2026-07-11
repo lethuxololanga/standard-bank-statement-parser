@@ -268,6 +268,12 @@ h1{
     margin-bottom:16px;
 }
 
+.feature-icon{
+    font-size:24px;
+    display:block;
+    margin-bottom:12px;
+}
+
 .feature-card p{
     color:#8a8a8a;
     line-height:1.7;
