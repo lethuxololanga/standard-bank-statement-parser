@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>StatementFlow | PDF → CSV Converter</title>
@@ -17,6 +17,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script type="text/babel" src="asset/shared.js"></script>
+    <script defer src="asset/cmdk.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc =
             "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -24,301 +25,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="styles/system.css">
-    <link rel="stylesheet" href="styles/converter.css">
+    <link rel="stylesheet" href="styles/app.css">
     <link rel="icon" type="image/svg+xml" href="/asset/favicon.svg">
-    <style>
-        /* ── Page layout ── */
-        .page-wrap       { max-width: 900px; margin: 0 auto; padding: 48px 20px 80px; }
-
-        /* ── Header ── */
-        .page-header     { margin-bottom: 32px; }
-        .page-title      { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
-        .page-title h1   { font-size: 28px; font-weight: 700; letter-spacing: -1px; }
-        .page-title-icon { font-size: 26px; }
-        .page-subtitle   { color: var(--text-muted); font-size: 13px; }
-
-        /* ── Nav bar ── */
-        .top-nav         { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
-        .top-nav a       { color: var(--text-dim); font-size: 13px; }
-        .top-nav a:hover { color: var(--text); }
-        .top-nav-sep     { color: var(--text-dim); }
-
-        /* ── Drop zone ── */
-        .drop-zone {
-            border: 2px dashed var(--border);
-            border-radius: var(--radius-lg);
-            padding: 48px 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: 0.2s ease;
-            background: var(--surface);
-            user-select: none;
-        }
-        .drop-zone:hover  { border-color: var(--border-hover); }
-        .drop-zone.drag   { border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.03); }
-        .drop-zone.loaded { border-color: rgba(255,255,255,0.25); }
-        .drop-zone-icon   { font-size: 36px; margin-bottom: 10px; }
-        .drop-zone-main   { font-size: 15px; font-weight: 500; color: var(--text); }
-        .drop-zone-sub    { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
-        .drop-zone-link   { text-decoration: underline; color: var(--text-muted); }
-
-        /* ── Action row ── */
-        .action-row       { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
-        .action-row .push { margin-left: auto; }
-
-        .btn {
-            padding: 10px 18px;
-            border-radius: var(--radius-sm);
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            border: 1px solid var(--border);
-            background: var(--surface);
-            color: var(--text);
-            transition: 0.2s ease;
-        }
-        .btn:hover            { border-color: var(--border-hover); opacity: 0.9; }
-        .btn:disabled         { opacity: 0.35; cursor: not-allowed; }
-        .btn.primary          { background: var(--text); color: var(--bg); border-color: transparent; }
-        .btn.primary:hover    { opacity: 0.85; }
-        .btn.ghost            { background: transparent; color: var(--text-dim); }
-        .btn.ghost:hover      { color: var(--text); border-color: var(--border-hover); }
-
-        /* ── Status / error banners ── */
-        .banner {
-            margin-top: 12px;
-            padding: 10px 16px;
-            border-radius: var(--radius-sm);
-            font-size: 13px;
-            border: 1px solid var(--border);
-            color: var(--text-muted);
-            background: var(--surface);
-        }
-        .banner.error { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.85); }
-
-        /* ── Stats bar ── */
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
-        @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
-
-        .stat-box {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            padding: 14px 12px;
-            text-align: center;
-        }
-        .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 6px; }
-        .stat-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
-
-        /* ── Filter bar ── */
-        .filter-bar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            align-items: flex-end;
-            margin-top: 16px;
-            padding: 16px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-        }
-        .filter-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; }
-        .filter-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); }
-        .filter-input-wrap { position: relative; }
-        .filter-icon  { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 12px; pointer-events: none; }
-        .filter-clear-x { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 16px; padding: 0; }
-        .filter-clear-x:hover { color: var(--text); }
-
-        input[type="text"], input[type="date"] {
-            padding: 8px 12px;
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--text);
-            font-size: 13px;
-            font-family: inherit;
-            outline: none;
-            width: 100%;
-        }
-        input[type="text"]:focus, input[type="date"]:focus { border-color: var(--border-hover); }
-        input[type="text"].has-icon { padding-left: 28px; }
-
-        .filter-count { font-size: 12px; color: var(--text-dim); white-space: nowrap; align-self: center; padding-bottom: 2px; }
-        .filter-count.active { color: var(--text-muted); }
-
-        /* ── Table ── */
-        .table-wrap {
-            margin-top: 16px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            overflow: hidden;
-            background: var(--surface);
-        }
-        .table-scroll { overflow-x: auto; }
-
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        thead tr { background: var(--surface); }
-        th {
-            padding: 10px 12px;
-            text-align: left;
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--text-dim);
-            border-bottom: 1px solid var(--border);
-            font-weight: 600;
-        }
-        th.right { text-align: right; }
-        td { padding: 7px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
-        tbody tr:last-child td { border-bottom: none; }
-        tbody tr:hover { background: rgba(255,255,255,0.02); }
-
-        .td-num  { font-variant-numeric: tabular-nums; color: var(--text-dim); font-size: 11px; text-align: right; }
-        .td-debit  { font-variant-numeric: tabular-nums; color: rgba(255,120,120,0.9); font-weight: 500; }
-        .td-credit { font-variant-numeric: tabular-nums; color: rgba(120,220,140,0.9); font-weight: 500; }
-        .td-balance{ font-variant-numeric: tabular-nums; color: var(--text-muted); }
-
-        td input {
-            width: 100%;
-            background: transparent;
-            border: 1px solid transparent;
-            color: inherit;
-            font-size: inherit;
-            font-family: inherit;
-            padding: 2px 4px;
-            border-radius: 6px;
-            outline: none;
-        }
-        td input:focus { border-color: var(--border-hover); background: rgba(255,255,255,0.03); }
-
-        .del-btn { background: none; border: none; color: transparent; cursor: pointer; font-size: 16px; padding: 0 4px; transition: 0.15s; }
-        tbody tr:hover .del-btn { color: var(--text-dim); }
-        .del-btn:hover { color: #fff !important; }
-
-        tfoot tr { background: var(--surface); border-top: 1px solid var(--border); }
-        tfoot td { padding: 10px 12px; font-size: 12px; color: var(--text-dim); font-weight: 600; }
-
-        .table-footer {
-            padding: 10px 16px;
-            border-top: 1px solid var(--border);
-        }
-        .add-row-btn { background: none; border: none; color: var(--text-dim); font-size: 12px; cursor: pointer; font-family: inherit; padding: 0; }
-        .add-row-btn:hover { color: var(--text); }
-
-        mark { background: rgba(255,255,255,0.15); color: #fff; border-radius: 3px; padding: 0 2px; }
-
-        /* ── Collapsible panels ── */
-        .panel {
-            margin-top: 16px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            overflow: hidden;
-            background: var(--surface);
-        }
-        .panel.warn { border-color: rgba(255,200,80,0.2); }
-
-        .panel-toggle {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 16px;
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            font-size: 13px;
-            font-family: inherit;
-            font-weight: 500;
-            cursor: pointer;
-            text-align: left;
-            transition: 0.15s;
-        }
-        .panel-toggle:hover { color: var(--text); }
-        .panel-toggle .ml { margin-left: auto; font-size: 11px; color: var(--text-dim); }
-        .panel.warn .panel-toggle { color: rgba(255,200,80,0.8); }
-
-        .panel-body { padding: 0 16px 14px; }
-        .panel-desc { font-size: 12px; color: var(--text-dim); margin-bottom: 10px; }
-
-        .warn-line {
-            font-family: monospace;
-            font-size: 11px;
-            color: rgba(255,200,80,0.7);
-            background: rgba(255,200,80,0.06);
-            border-radius: 6px;
-            padding: 4px 8px;
-            margin-bottom: 4px;
-        }
-
-        pre.raw-lines {
-            background: #050505;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: rgba(120,220,140,0.8);
-            font-size: 11px;
-            font-family: monospace;
-            line-height: 1.6;
-            padding: 16px;
-            max-height: 280px;
-            overflow: auto;
-        }
-
-        /* ── Footer note ── */
-        .page-footnote { margin-top: 40px; text-align: center; font-size: 12px; color: var(--text-dim); line-height: 2; }
-        .page-footnote span { color: var(--text-muted); }
-
-        /* ── Light mode overrides ── */
-        [data-theme="light"] {
-            --bg:           #f5f5f5;
-            --surface:      #ffffff;
-            --border:       rgba(0,0,0,0.09);
-            --border-hover: rgba(0,0,0,0.22);
-            --text:         #0a0a0a;
-            --text-muted:   rgba(0,0,0,0.55);
-            --text-dim:     rgba(0,0,0,0.35);
-        }
-
-        [data-theme="light"] body { background: var(--bg); color: var(--text); }
-
-        /* Hardcoded rgba whites → light-safe equivalents */
-        [data-theme="light"] .drop-zone.drag   { border-color: rgba(0,0,0,0.3); background: rgba(0,0,0,0.02); }
-        [data-theme="light"] .drop-zone.loaded { border-color: rgba(0,0,0,0.2); }
-        [data-theme="light"] tbody tr:hover    { background: rgba(0,0,0,0.02); }
-        [data-theme="light"] td                { border-bottom-color: rgba(0,0,0,0.05); }
-        [data-theme="light"] td input:focus    { background: rgba(0,0,0,0.02); }
-        [data-theme="light"] .del-btn:hover    { color: #000 !important; }
-        [data-theme="light"] mark              { background: rgba(0,0,0,0.1); color: #000; }
-        [data-theme="light"] pre.raw-lines     { background: #f0f0f0; border-color: var(--border); color: #2a7a2a; }
-        [data-theme="light"] .panel.warn       { border-color: rgba(160,110,0,0.25); }
-        [data-theme="light"] .panel.warn .panel-toggle { color: rgba(140,90,0,0.9); }
-        [data-theme="light"] .warn-line        { color: rgba(140,90,0,0.8); background: rgba(200,140,0,0.08); }
-        [data-theme="light"] .banner.error     { border-color: rgba(0,0,0,0.2); color: rgba(0,0,0,0.85); }
-        [data-theme="light"] .td-debit         { color: #c0392b; }
-        [data-theme="light"] .td-credit        { color: #27ae60; }
-
-        /* ── Theme toggle button ── */
-        .theme-toggle {
-            margin-left: auto;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 12px;
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border);
-            background: var(--surface);
-            color: var(--text-dim);
-            font-size: 12px;
-            font-family: inherit;
-            cursor: pointer;
-            transition: 0.2s ease;
-            user-select: none;
-        }
-        .theme-toggle:hover { border-color: var(--border-hover); color: var(--text); }
-        .theme-toggle-icon  { font-size: 14px; }
-    </style>
 
 </head>
 
@@ -517,7 +227,7 @@ function App() {
     const [resetKey, setResetKey] = useState(0);
     const [theme,    setTheme]    = useState(() => {
         const saved = localStorage.getItem("sf-theme");
-        return saved || "dark";
+        return saved || "light";
     });
 
     // Apply theme to <html> element
@@ -629,7 +339,7 @@ function App() {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         } catch {
-            setError("Clipboard access denied — use Download instead.");
+            setError("Clipboard access denied. Use Download instead.");
         }
     }
 
@@ -663,24 +373,33 @@ function App() {
     const hasData = rows.length > 0;
 
     return (
-        <div className="page-wrap">
-
-            {/* Nav breadcrumb */}
-            <div className="top-nav">
-                <a href="index.html">StatementFlow</a>
-                <span className="top-nav-sep">›</span>
-                <span style={{color:"var(--text-muted)"}}>Standard Bank Converter</span>
+        <>
+        <nav className="nav">
+            <div className="container nav-inner">
+                <a href="index.html" className="wordmark">StatementFlow<span className="wordmark-dot">.</span></a>
+                <div className="nav-links">
+                    <a href="standardbank.html" className="active">Standard Bank</a>
+                    <a href="gotyme.html">GoTyme</a>
+                    <a href="index.html#how-it-works">How it works</a>
+                </div>
+                <button className="cmdk-pill" data-cmdk-trigger type="button">
+                    <i className="ph ph-magnifying-glass"></i>
+                    Jump to converter
+                    <kbd>⌘K</kbd>
+                </button>
                 <button className="theme-toggle" onClick={toggleTheme}>
-                    <span className="theme-toggle-icon">{theme === "dark" ? <i className="ph ph-sun"></i> : <i className="ph ph-moon"></i>}</span>
+                    <i className={theme === "dark" ? "ph ph-sun" : "ph ph-moon"}></i>
                     {theme === "dark" ? "Light" : "Dark"}
                 </button>
             </div>
+        </nav>
+
+        <div className={`page-wrap${hasData ? "" : " page-wrap--empty"}`}>
 
             {/* Header */}
             <div className="page-header">
                 <div className="page-title">
-                    {/* <span className="page-title-icon">▣</span> */}
-                    <img src="https://cdn.brandfetch.io/idDKBygDQO/theme/light/symbol.svg?c=1bxid64Mup7aczewSAYMX&t=1668074901080" alt="StatementFlow" style={{width:'32px',height:'32px',objectFit:'contain'}} />
+                    <i className="ph ph-file-csv page-title-icon"></i>
                     <h2>PDF → CSV</h2>
                 </div>
                 <p className="page-subtitle">Transform your Standard Bank statement into clean, structured data - instantly.</p>
@@ -743,11 +462,22 @@ function App() {
 
             <RawLinesPanel lines={rawLines} />
 
-            <div className="page-footnote">
-                <p>Runs entirely in your browser — no data is uploaded anywhere.</p>
-                <p>StatementFlow is developed by <span>Lethu Langa</span></p>
-            </div>
         </div>
+
+        <footer className="site-footer">
+            <div className="container footer-inner">
+                <span className="wordmark" style={{fontSize:"0.9rem"}}>StatementFlow</span>
+                <span className="sep">·</span>
+                <span>Runs in your browser, no uploads.</span>
+                <span className="push"></span>
+                <a href="privacy.html">Privacy</a>
+                <span className="sep">·</span>
+                <a href="terms.html">Terms</a>
+                <span className="sep">·</span>
+                <a href="mailto:lethu@easystudio.co.za">Contact</a>
+            </div>
+        </footer>
+        </>
     );
 }
 

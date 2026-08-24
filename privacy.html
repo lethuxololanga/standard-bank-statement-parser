@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy Policy | StatementFlow</title>
+    <meta name="description" content="How StatementFlow handles your bank statement data. In short: it doesn't leave your device." />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <link rel="icon" type="image/svg+xml" href="/asset/favicon.svg">
+    <link rel="stylesheet" href="styles/legal.css">
+    <script defer src="asset/cmdk.js"></script>
+</head>
+
+<body>
+
+    <nav class="nav">
+        <div class="container nav-inner">
+            <a href="index.html" class="wordmark">StatementFlow<span class="wordmark-dot">.</span></a>
+            <div class="nav-links">
+                <a href="standardbank.html">Standard Bank</a>
+                <a href="gotyme.html">GoTyme</a>
+                <a href="index.html#how-it-works">How it works</a>
+            </div>
+            <button class="cmdk-pill" data-cmdk-trigger type="button">
+                <i class="ph ph-magnifying-glass"></i>
+                Jump to converter
+                <kbd>⌘K</kbd>
+            </button>
+            <a href="standardbank.html" class="nav-btn">Open converter</a>
+        </div>
+    </nav>
+
+    <main class="legal-page">
+
+        <a href="index.html" class="back-link"><i class="ph ph-arrow-left"></i> Back home</a>
+
+        <div class="updated">Last updated · May 2026</div>
+        <h1>Privacy Policy</h1>
+
+        <p>StatementFlow converts PDF bank statements into CSV files entirely inside your browser. This policy explains, plainly, what that means for your data.</p>
+
+        <h2>Your statement never leaves your device</h2>
+        <p>PDF parsing runs client-side using PDF.js in your browser. There is no server upload step. Your statement file, and the transaction data extracted from it, is never sent to StatementFlow or to any server we operate. You can verify this yourself: the source is on GitHub, and a browser's network tab will show no request carrying your file or its contents.</p>
+
+        <h2>What we do store</h2>
+        <ul>
+            <li><strong>Theme preference</strong>: light or dark mode, saved in your browser's <code>localStorage</code> under the key <code>sf-theme</code>. This never leaves your device either.</li>
+        </ul>
+        <p>That's the only thing StatementFlow itself writes to your browser. No accounts, no cookies, no analytics are installed on this site at this time. If that changes, this page will be updated first.</p>
+
+        <h2>Third-party resources</h2>
+        <p>The page loads a small number of resources from third-party CDNs to function: React, PDF.js, and Babel (for the converter), and Google Fonts and Phosphor Icons (for typography and icons). Requesting these files may expose your IP address and browser information to those providers, subject to their own privacy policies. None of them receive your statement data. Only the static library files are fetched.</p>
+
+        <h2>POPIA</h2>
+        <p>Because your bank statement and the data extracted from it are never transmitted or stored by StatementFlow, our processing footprint under South Africa's Protection of Personal Information Act is minimal by design: we don't collect, store, or process your financial data at all.</p>
+
+        <h2>Questions</h2>
+        <p>Reach out at <a href="mailto:lethu@easystudio.co.za">lethu@easystudio.co.za</a> with any privacy questions.</p>
+
+    </main>
+
+    <footer class="site-footer">
+        <div class="container footer-inner">
+            <span class="wordmark" style="font-size: 0.9rem;">StatementFlow</span>
+            <span class="sep">·</span>
+            <span>Runs in your browser, no uploads.</span>
+            <span class="push"></span>
+            <a href="privacy.html">Privacy</a>
+            <span class="sep">·</span>
+            <a href="terms.html">Terms</a>
+            <span class="sep">·</span>
+            <a href="mailto:lethu@easystudio.co.za">Contact</a>
+        </div>
+    </footer>
+
+</body>
+
+</html>

@@ -1,31 +1,28 @@
 /* =========================================
-   SHARED DESIGN SYSTEM
-   VERSION 1.0.0
+   SHARED BASE
+   VERSION 2.0.0 — Cobalt
    ========================================= */
 
-:root {
-    --bg: #000;
-    --surface: #050505;
-    --border: rgba(255,255,255,0.08);
-    --border-hover: rgba(255,255,255,0.18);
+@import url("./tokens.css");
 
-    --text: #ffffff;
-    --text-muted: rgba(255,255,255,0.65);
-    --text-dim: rgba(255,255,255,0.4);
-
-    --radius-sm: 12px;
-    --radius-md: 18px;
-    --radius-lg: 24px;
-    --radius-xl: 32px;
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
-/* ---------- BASE ---------- */
+html {
+    scroll-behavior: smooth;
+    overflow-x: clip;
+}
 
 body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: "Inter", sans-serif;
+    background: var(--color-paper);
+    color: var(--color-ink-2);
+    font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
+    overflow-x: clip;
+    transition: background-color var(--dur-med) var(--ease-out), color var(--dur-med) var(--ease-out);
 }
 
 a {
@@ -33,121 +30,18 @@ a {
     text-decoration: none;
 }
 
-/* ---------- CONTAINERS ---------- */
-
 .container {
     width: 90%;
     max-width: 1200px;
     margin: 0 auto;
 }
 
-/* ---------- SURFACES ---------- */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-rule-2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-ink-dim); }
 
-.ui-surface {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-}
-
-/* ---------- BUTTONS ---------- */
-
-.ui-button {
-    padding: 14px 20px;
-    border-radius: var(--radius-md);
-    font-weight: 600;
-    font-size: 14px;
-    cursor: pointer;
-    transition: 0.2s ease;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text);
-}
-
-.ui-button:hover {
-    border-color: var(--border-hover);
-    transform: translateY(-1px);
-    opacity: 0.9;
-}
-
-.ui-button.primary {
-    background: var(--text);
-    color: var(--bg);
-}
-
-.ui-button.primary:hover {
-    opacity: 0.85;
-}
-
-/* ---------- INPUTS ---------- */
-
-.ui-input {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: transparent;
-    color: var(--text);
-    outline: none;
-}
-
-.ui-input:focus {
-    border-color: var(--border-hover);
-}
-
-/* ---------- BADGES ---------- */
-
-.ui-badge {
-    display: inline-flex;
-    padding: 6px 10px;
-    border-radius: 999px;
-    font-size: 12px;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    background: rgba(255,255,255,0.03);
-}
-
-/* ---------- TEXT ---------- */
-
-.text-muted {
-    color: var(--text-muted);
-}
-
-.text-dim {
-    color: var(--text-dim);
-}
-
-/* ---------- TABLE ---------- */
-
-.ui-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-}
-
-.ui-table th {
-    text-align: left;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-dim);
-    border-bottom: 1px solid var(--border);
-    padding: 10px;
-}
-
-.ui-table td {
-    padding: 10px;
-    border-bottom: 1px solid var(--border);
-}
-
-.ui-table tr:hover {
-    background: rgba(255,255,255,0.03);
-}
-
-/* ---------- FOOTER ---------- */
-
-.ui-footer {
-    border-top: 1px solid var(--border);
-    padding: 40px 0;
-    color: var(--text-dim);
-    font-size: 12px;
+:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
 }

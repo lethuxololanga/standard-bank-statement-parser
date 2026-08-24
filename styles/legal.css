@@ -1,0 +1,60 @@
+/* Hallmark · genre: modern-minimal · macrostructure: Long Document (legal content)
+ * design-system: design.md · designed-as-app · nav: N13 · footer: Ft2
+ * theme: Cobalt
+ */
+
+@import url("./system.css");
+@import url("./shell.css");
+
+.legal-page {
+    max-width: 68ch;
+    margin: 0 auto;
+    padding: var(--space-xl) 20px var(--space-2xl);
+}
+
+.legal-page .updated {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--color-ink-dim);
+    margin-bottom: var(--space-2xs);
+}
+
+.legal-page h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: var(--text-2xl);
+    letter-spacing: -0.01em;
+    color: var(--color-ink);
+    margin-bottom: var(--space-lg);
+}
+
+.legal-page h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: var(--text-lg);
+    color: var(--color-ink);
+    margin-top: var(--space-xl);
+    margin-bottom: var(--space-2xs);
+}
+
+.legal-page p, .legal-page li {
+    font-size: var(--text-sm);
+    line-height: 1.75;
+    color: var(--color-ink-2);
+}
+
+.legal-page ul {
+    margin: var(--space-2xs) 0 var(--space-sm) 1.2em;
+}
+
+.legal-page a { color: var(--color-accent); text-decoration: underline; }
+
+.legal-page .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-sm);
+    color: var(--color-ink-dim);
+    margin-bottom: var(--space-lg);
+}
+.legal-page .back-link:hover { color: var(--color-ink); }

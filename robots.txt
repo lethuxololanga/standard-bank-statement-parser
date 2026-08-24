@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://lethuxololanga.github.io/statement-convert/sitemap.xml
